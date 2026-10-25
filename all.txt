@@ -1,5 +1,5 @@
 Adam — 4:41 PM
-Prompt 1: Implement the complete app without requiring me to manually enter note sequences. Find and verify suitable musical sources for each song, and create beginner-friendly arrangements using sources that may legally be used. Do not invent or guess note sequences. If you cannot obtain a song's arrangement legally and accurately, tell me which song is blocked and continue building the rest of the app without pretending that the placeholder is the real song. Keep the song catalog structured so I can add or replace arrangements later. After implementation, verify that the generated audio, musical notation, six-note phrases, and scoring all use the same note data.
+Prompt 1: Implement the complete app without requiring me to manually enter note sequences. Find and verify suitable musical sources for each song, and create beginner-friendly arrangements using sources that may legally be used. Do not invent or guess note sequences. Record each song's source (for example, a public-domain score on IMSLP or the Mutopia Project, or "traditional melody") and its license in the song's data. If you cannot reach these sources, transcribe the well-known public-domain melody, mark its source as unverified, and tell me which songs need checking. If you cannot obtain a song's arrangement legally and accurately, tell me which song is blocked and continue building the rest of the app without pretending that the placeholder is the real song. Keep the song catalog structured so I can add or replace arrangements later. After implementation, verify that the generated audio, musical notation, phrases, and scoring all use the same note data.
 # Project: Beginner Piano Learning App — Phase Two
 
 Approach this project as an expert senior Android Studio engineer and system architect. Build a professional, user-friendly Android application using Kotlin in Android Studio.
@@ -8,13 +8,13 @@ This project builds on the concept of my previous piano-learning application. Ho
 
 The purpose of the application is to teach beginners how to play piano songs through structured, interactive lessons, similar to how Duolingo teaches languages.
 
-The app should retain the original application's core format, professional design, audio analysis, musical notation, graphs, feedback, scoring, and saved-test functionality. The main change is that the application will now teach 10 actual songs, divided into six-note phrases, with a progression and achievement system.
+The app should retain the original application's core format, professional design, audio analysis, musical notation, graphs, feedback, scoring, and saved-test functionality. The main change is that the application will now teach 6 actual songs, divided into short phrases that follow the melody, with a progression and achievement system.
 
 ## 1. Core Requirements and Preservation of Existing Functionality
 
 Preserve and implement all of the following functionality from the original application:
 
-- Randomized or appropriately selected note sequences where applicable.
+- Randomized note sequences, kept as an optional Free Practice mode (the original random six-note exercise) that does not affect song progress.
 - Letter notation and octave notation, such as C4, E4, and G4.
 - Accurate standard musical notation on a musical staff.
 - Reference audio synthesis and WAV file generation.
@@ -38,24 +38,24 @@ The application should maintain the same general lesson and results format as th
 
 ## 2. Song Selection Menu
 
-Create a professional song-selection screen that displays all 10 beginner songs.
+Create a professional song-selection screen that displays all 6 beginner songs.
 
 The user must be able to select a song from this menu and view their progress on each song.
 
-The 10 songs are:
+The 6 songs are:
 
 1. Twinkle, Twinkle, Little Star
 2. Mary Had a Little Lamb
 3. Ode to Joy — Ludwig van Beethoven
-4. Let It Be — The Beatles
-5. Lean on Me — Bill Withers
-6. In the End — Linkin Park
-7. Heart and Soul
-8. Happy Birthday
-9. Jingle Bells
-10. Prelude in C Major — J. S. Bach
+4. Happy Birthday
+5. Jingle Bells
+6. Prelude in C Major — J. S. Bach (opening four bars, right hand only)
 
 Use beginner-friendly arrangements of these songs. The arrangements should prioritize simple melodies, manageable rhythms, and appropriate difficulty for someone learning piano for the first time.
+
+Arrange every song in C major so that it uses only white keys, and keep it within a comfortable beginner range of about G3 to G5.
+
+The Prelude in C Major has no melody; it is built from a repeating broken-chord figure. Use only its opening four bars, which form a complete cadence, and teach only the right-hand figure. Teach it without the sustain pedal so that each note can be detected separately.
 
 The application should initially focus on a beginner-friendly right-hand melody. Do not require complicated left-hand accompaniment unless it is explicitly introduced as part of an optional future lesson.
 
@@ -85,7 +85,7 @@ Implement each song as structured musical data, including:
 - Tempo or reference timing.
 - Musical notation information.
 
-Represent notes using a consistent internal data model, such as MIDI note numbers and durations measured in beats or milliseconds. Convert these values into letter notation, octave notation, frequencies, and standard musical notation as needed.
+Represent notes using a consistent internal data model, such as MIDI note numbers and durations measured in beats or milliseconds. Convert these values into letter notation, octave notation, frequencies, and standard musical notation as needed. Use scientific pitch notation, in which middle C is C4 (MIDI note 60) and A4 is 440 Hz.
 
 The song arrangements must be musically coherent, recognizable, and suitable for beginners.
 
@@ -93,15 +93,15 @@ Use a reliable music-data representation so that the same underlying note sequen
 
 **Do not generate the reference audio, musical staff, and scoring targets independently.** They must all use the same authoritative song data so that they cannot contradict one another.
 
-For copyrighted songs, use only arrangements and musical material that you are permitted to include. Do not assume that a song is free to reproduce merely because a beginner arrangement is being used. Keep song data modular so that authorized arrangements can be added or replaced later. Use public-domain material where appropriate and provide clearly identified substitutes or placeholders for songs whose complete arrangements cannot legally be included.
+All songs in the current catalog are in the public domain. For copyrighted songs added later, use only arrangements and musical material that you are permitted to include. Do not assume that a song is free to reproduce merely because a beginner arrangement is being used. Keep song data modular so that authorized arrangements can be added or replaced later. Use public-domain material where appropriate and provide clearly identified substitutes or placeholders for songs whose complete arrangements cannot legally be included.
 
-## 4. Six-Note Phrase System
+## 4. Phrase System
 
-Divide each song into sequential learning phrases containing six notes each.
+Divide each song into sequential learning phrases that follow the natural phrases of the melody, such as one line of lyrics or one half of a four-bar phrase. Most phrases should contain 6–8 notes. For example, each line of Twinkle, Twinkle, Little Star is a 7-note phrase. If a natural phrase is much longer, split it at a bar line.
 
-Each phrase should represent a meaningful section of the melody wherever practical. Avoid splitting a note or musical event in a way that makes the phrase impossible to interpret.
+Store the phrase boundaries in each song's data rather than computing them from a fixed note count, so that each song is split where its music naturally breaks. Never split a note or musical event across two phrases.
 
-The app should display the current six-note phrase using:
+The app should display the current phrase using:
 - Letter and octave notation, such as C4, D4, and E4.
 - Standard musical notation on a musical staff.
 - Reference audio playback.
@@ -112,15 +112,15 @@ For example, the application might display:
 
 Song: Twinkle, Twinkle, Little Star
 
-Phrase 1 of 8
+Phrase 1 of 6
 
-C4 — C4 — G4 — G4 — A4 — A4
+C4 — C4 — G4 — G4 — A4 — A4 — G4
 
 This is only an illustrative example. The actual notes, note durations, and phrase boundaries must be determined by the selected song's musical arrangement.
 
-The application should automatically determine the number of phrases from the song's note data.
+The application should automatically determine the number of phrases from the phrase boundaries in the song's data.
 
-If the total number of notes is not divisible by six, handle the final phrase appropriately. Do not invent extra notes merely to fill a phrase. The final phrase may contain fewer than six notes, and the interface should clearly indicate its length.
+Phrases may have different lengths, and the interface should clearly show how many notes the current phrase contains. Do not invent extra notes or pad a phrase to reach a particular length.
 
 A phrase's reference recording should include the correct note sequence, durations, rests, and timing for that phrase.
 
@@ -164,7 +164,7 @@ A student should be able to revisit completed phrases for practice without losin
 
 ## 6. Song Completion and Star Achievement
 
-The student must complete every phrase of a song before that song can be marked as completed.
+The student must complete every phrase of a song before that song can be marked as completed. A phrase counts as completed once its best score is at least 50.
 
 To earn a star, the student must achieve an **overall song score of at least 90/100**.
 
@@ -178,23 +178,19 @@ For example:
 
 The student earns a star only if the final overall song score is at least 90/100.
 
-Calculate the overall score using a consistent mathematical method that accounts for performance across the entire song.
+Calculate the overall song score as the average of each phrase's best score, weighted by the number of notes in that phrase:
 
-Prefer a weighted calculation based on the individual notes or musical events in the song rather than simply averaging phrase scores when phrases have different lengths or numbers of notes.
+Overall song score = Σ (best phrase score × notes in phrase) ÷ Σ (notes in phrase)
 
-The song score should consider:
-- Note accuracy.
-- Note order.
-- Timing accuracy.
-- Rhythm and tempo consistency.
+Weighting by note count keeps longer phrases from counting the same as shorter ones. Because each phrase score already measures note accuracy, note order, timing accuracy, and rhythm and tempo consistency, the overall score accounts for all four across the entire song. Because it uses best phrase scores, it never decreases.
 
-Normalize the resulting score to a range of 0–100.
+The result is on a 0–100 scale. Round it as described in Section 11.
 
 The scoring system should be transparent and consistent. A student should not receive a star if the calculated overall score is below 90.
 
 The star should be saved permanently once earned. Replaying a song with a lower score must never remove an existing star.
 
-A student who finishes a song with an overall score below 90 should still be able to see their completion and results. They may replay phrases and improve their performance. Recalculate their overall song score when appropriate and award the star if they later meet the requirement.
+A student who finishes a song with an overall score below 90 should still be able to see their completion and results. They may replay phrases and improve their performance. Recalculate their overall song score whenever a phrase's best score improves, and award the star if they later meet the requirement.
 
 ## 7. Song-Level Progress Tracking
 
@@ -205,7 +201,7 @@ For each song, persist:
 - The number of completed phrases.
 - The most recent score for each phrase.
 - The best score for each phrase.
-- The number of attempts.
+- The number of attempts for each phrase and for the song as a whole.
 - The overall song score.
 - Whether the song has been fully completed.
 - Whether the song has earned a star.
@@ -219,7 +215,7 @@ For example, a song card could show:
 
 Twinkle, Twinkle, Little Star
 
-Progress: 3 of 8 phrases completed
+Progress: 3 of 6 phrases completed
 
 Best overall score: 87/100
 
@@ -286,6 +282,8 @@ The app should:
 
 The pitch-detection system should account for harmonics, background noise, silence, and imperfect recordings.
 
+Detect where each note begins (for example, from sudden rises in energy or spectral flux), not only where the pitch changes, so that repeated notes such as C4 — C4 at the start of Twinkle, Twinkle, Little Star are counted as two notes.
+
 When confidence in a detected note is too low, indicate that the note could not be identified reliably instead of pretending the result is certain.
 
 The user must be able to review their performance before deciding to retry or continue.
@@ -304,13 +302,15 @@ Calculate each phrase score from measurable performance characteristics, such as
 
 Use a consistent matching algorithm to align detected notes with the expected sequence, including when the user plays more slowly or quickly than the reference.
 
-For example, a sequence of six expected notes should not receive a perfect score simply because all six notes appear somewhere in the recording if they were played in the wrong order.
+For example, a phrase should not receive a perfect score simply because all of its expected notes appear somewhere in the recording if they were played in the wrong order.
 
 Define the scoring formula explicitly in the code and document how each component contributes to the final score.
 
 Use sensible tolerances for timing and pitch detection. Do not penalize a user excessively for tiny timing differences that are normal for a beginner.
 
 Make sure the score is deterministic: the same expected notes and detected performance should produce the same score.
+
+Calculate the score as a decimal, then round it once to a whole number (round half up). Use that whole number everywhere: on screen, in storage, and for the 50-point unlock and 90-point star thresholds. For example, 49.5 becomes 50 and unlocks the next phrase; 49.4 becomes 49 and does not.
 
 The phrase unlocking and song-star requirements must use the actual calculated scores.
 
@@ -319,7 +319,7 @@ The phrase unlocking and song-star requirements must use the actual calculated s
 After every phrase attempt, provide useful feedback based on the detected performance.
 
 Examples include:
-- "You played 5 out of 6 notes correctly."
+- "You played 6 out of 7 notes correctly."
 - "Your timing was slower than the reference."
 - "You played C4 correctly but missed E4."
 - "Your note order was correct."
@@ -432,7 +432,7 @@ The song-selection screen should clearly communicate which songs are available, 
 The lesson screen should clearly communicate:
 1. Which song the student selected.
 2. Which phrase they are practicing.
-3. Which six notes they need to play.
+3. Which notes they need to play.
 4. What the notes look like on a musical staff.
 5. How to listen to the reference.
 6. How to record their performance.
@@ -458,6 +458,7 @@ Since the project starts empty:
 - Ensure that song data, generated audio, musical notation, note detection, and scoring use consistent information.
 - Implement persistent progression and achievement rules.
 - Test important edge cases, including restarting the app, retaking a phrase, scoring below 50, earning exactly 50, scoring below 90 overall, and earning exactly 90 overall.
+- Test the progression and star rules with unit tests that supply scores directly, such as 49, 50, 89, and 90. Supplying scores in tests is expected; the ban on hardcoded scores applies to the app itself.
 - Ensure that the app compiles and fix build errors introduced by the implementation.
 - Avoid replacing real functionality with hardcoded demo scores, fake note detection, or placeholder buttons.
 - Do not claim that a feature is implemented if it is only a visual placeholder.
@@ -470,7 +471,7 @@ If a feature requires a technical trade-off, choose the most reliable practical 
 
 The implementation is not complete until the following conditions are met:
 
-1. The app launches and displays all 10 songs.
+1. The app launches and displays all 6 songs.
 2. A student can select a song and practice its first phrase.
 3. The app displays the correct notes in letter, octave, and musical-staff notation.
 4. The reference audio matches the selected song and phrase.
@@ -487,10 +488,15 @@ The implementation is not complete until the following conditions are met:
 15. Progress and phrase unlocks persist after the app restarts.
 16. Previous attempts and WAV recordings remain accessible through Test History.
 17. Reviewing old tests does not alter current progress.
-18. All 10 songs use coherent, beginner-appropriate arrangements and consistent musical data.
+18. All 6 songs use coherent, beginner-appropriate arrangements and consistent musical data.
 19. The project builds successfully, and the implemented screens and controls perform their intended actions.
 
-**Final priority:** Preserve the original app's complete learning, audio-analysis, graphing, feedback, scoring, and saved-test experience while adding the 10-song catalog, six-note phrase progression, persistent progress tracking, and song-level star achievements. The application must be fully functional and ready for further development, not merely a visual prototype.
+**Final priority:** Preserve the original app's complete learning, audio-analysis, graphing, feedback, scoring, and saved-test experience while adding the 6-song catalog, phrase-by-phrase progression, persistent progress tracking, and song-level star achievements. The application must be fully functional and ready for further development, not merely a visual prototype.
+
+# Appendix: Original Phase One Specification
+
+The following is the specification of the original application. Use it as the reference for the features, format, and behavior that Phase Two must preserve. In Phase Two, song-based lessons replace the random six-note sequence as the main lesson flow; the random exercise remains only as the optional Free Practice mode.
+
 Approach this app as an **expert senior Android Studio engineer and system architect**. Make this app user-friendly, with a professional look and feel. This app will be written in **Android Studio using Kotlin**.
 
 The purpose of this app is to teach users how to play basic notes on a piano. This is **Phase One** of a much larger project that will eventually teach users how to master an instrument through structured lessons, similar to how Duolingo teaches languages.
