@@ -1,0 +1,50 @@
+name: CI
+
+# Shared-code tests, Android lint and the Android build. Runs on Linux, which is cheap,
+# so it runs for every pull request and every push to master.
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    name: Tests, lint and Android build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Test, lint and build
+        run: >
+          ./gradlew --console=plain
+          :core:jvmTest
+          :core:testAndroidHostTest
+          :composeApp:testAndroidHostTest
+          :androidApp:lintDebug
+          :androidApp:assembleDebug
+
+      - name: Upload test and lint reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-reports
+          path: |
+            **/build/reports/
+            **/build/test-results/
+          retention-days: 7

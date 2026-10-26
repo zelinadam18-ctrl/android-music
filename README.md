@@ -1,5 +1,7 @@
 # Piano Trainer
 
+[![CI](https://github.com/rudi-cilibrasi/musicprompt/actions/workflows/ci.yml/badge.svg)](https://github.com/rudi-cilibrasi/musicprompt/actions/workflows/ci.yml) [![iOS](https://github.com/rudi-cilibrasi/musicprompt/actions/workflows/ios.yml/badge.svg)](https://github.com/rudi-cilibrasi/musicprompt/actions/workflows/ios.yml)
+
 A beginner piano trainer for Android and iOS phones. Students learn real songs phrase by phrase: they listen to a reference, record themselves on a real piano, and get a score and feedback based on pitch detection and timing analysis.
 
 - [Specification](docs/SPEC.md): what the app must do.

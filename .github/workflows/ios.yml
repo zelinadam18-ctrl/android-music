@@ -1,0 +1,84 @@
+name: iOS
+
+# iOS tests and the Xcode build need a macOS runner. In a private repository macOS minutes
+# count 10x against the free Actions allowance, so this only runs when iOS-relevant files
+# change, once a week (to catch anything the path filter missed), and on demand.
+on:
+  pull_request:
+    paths:
+      - "iosApp/**"
+      - "composeApp/src/iosMain/**"
+      - "composeApp/build.gradle.kts"
+      - "core/build.gradle.kts"
+      - "gradle/**"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
+      - ".github/workflows/ios.yml"
+  push:
+    branches: [master]
+    paths:
+      - "iosApp/**"
+      - "composeApp/src/iosMain/**"
+      - "composeApp/build.gradle.kts"
+      - "core/build.gradle.kts"
+      - "gradle/**"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
+      - ".github/workflows/ios.yml"
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ios:
+    name: iOS tests and Xcode build
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Cache Kotlin/Native toolchain
+        uses: actions/cache@v6
+        with:
+          path: ~/.konan
+          key: konan-${{ runner.os }}-${{ hashFiles('gradle/libs.versions.toml') }}
+
+      - name: Shared tests on the iOS simulator
+        run: ./gradlew --console=plain :core:iosSimulatorArm64Test :composeApp:iosSimulatorArm64Test
+
+      - name: Build the iOS app for the simulator
+        run: >
+          xcodebuild
+          -project iosApp/iosApp.xcodeproj
+          -target iosApp
+          -configuration Debug
+          -sdk iphonesimulator
+          -arch arm64
+          CODE_SIGNING_ALLOWED=NO
+          build
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-reports
+          path: |
+            **/build/reports/
+            **/build/test-results/
+          retention-days: 7
