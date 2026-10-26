@@ -89,6 +89,7 @@ class Phrase(val index: Int, val events: List<NoteEvent>, val startBeat: Double)
  * @property pickupBeats length of any pickup (anacrusis) before the first full bar, in beats.
  * @property source where the notes were taken from (a URL or "traditional").
  * @property sourceVerified true once a person has checked every note against [source].
+ * @property arrangerNotes choices made when arranging, e.g. a simplified rhythm.
  */
 class Song(
     val id: String,
@@ -102,6 +103,7 @@ class Song(
     val sourceVerified: Boolean,
     phrases: List<List<NoteEvent>>,
     val pickupBeats: Double = 0.0,
+    val arrangerNotes: String? = null,
 ) {
     val phrases: List<Phrase>
 
