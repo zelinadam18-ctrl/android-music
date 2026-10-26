@@ -17,3 +17,11 @@ captures
 !*.xcworkspace/contents.xcworkspacedata
 **/xcshareddata/WorkspaceSettings.xcsettings
 node_modules/
+
+# Xcode
+DerivedData/
+*.xcuserstate
+
+# Windows
+Thumbs.db
+desktop.ini

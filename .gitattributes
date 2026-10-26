@@ -1,0 +1,17 @@
+# Normalize line endings so macOS, Windows and Linux checkouts all work.
+* text=auto
+
+# Shell scripts must keep LF, even on Windows checkouts.
+/gradlew text eol=lf
+*.sh text eol=lf
+
+# Windows batch files need CRLF.
+*.bat text eol=crlf
+
+# Binary files: never touch line endings or try to diff them.
+*.jar binary
+*.wav binary
+*.png binary
+*.jpg binary
+*.ttf binary
+*.otf binary
