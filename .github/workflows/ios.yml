@@ -90,8 +90,10 @@ jobs:
           xcrun simctl launch "$device" "$bundle_id"
           sleep 10
           xcrun simctl io "$device" screenshot ios-simulator.png
-          # The app must still be running, i.e. it didn't crash on start.
-          xcrun simctl spawn "$device" launchctl list | grep -q "$bundle_id"
+          # The app must still be running, i.e. it didn't crash on start. (Save the list first:
+          # piping into `grep -q` can kill launchctl with SIGPIPE, which pipefail reports as a failure.)
+          xcrun simctl spawn "$device" launchctl list > launchctl.txt
+          grep -q "$bundle_id" launchctl.txt
           echo "$bundle_id is running on $(xcrun simctl list devices | grep "$device" | sed 's/^ *//')"
 
       - name: Upload simulator screenshot
