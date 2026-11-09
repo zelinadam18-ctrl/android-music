@@ -11,6 +11,8 @@ import io.github.rudicilibrasi.pianotrainer.core.music.Pitch
  * @property confidence how sure the detector is about [pitch], from 0 (not at all) to 1.
  * @property uncertain true when the detector could not identify the note reliably. An uncertain
  *   note is shown to the student as "?" and never counts as a correct note.
+ * @property cents how far the played frequency was from [pitch], in cents (−50 to +50), when
+ *   known. Positive is sharp.
  */
 data class DetectedNote(
     val pitch: Pitch?,
@@ -18,6 +20,7 @@ data class DetectedNote(
     val endMs: Double,
     val confidence: Double,
     val uncertain: Boolean,
+    val cents: Double? = null,
 ) {
     init {
         require(startMs.isFinite() && endMs.isFinite() && endMs >= startMs) {

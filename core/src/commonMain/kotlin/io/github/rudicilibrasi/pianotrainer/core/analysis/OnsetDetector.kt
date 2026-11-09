@@ -19,8 +19,9 @@ data class Onset(val timeSeconds: Double, val strength: Double)
  * pitch (C4 — C4 at the start of Twinkle, E4 — E4 — E4 in Jingle Bells), because every new
  * hammer strike makes the spectrum jump up again even when the pitch doesn't change.
  *
- * 1. Short-time spectrum (Hann window, about 23 ms frames every 5 ms), as log magnitude clipped at
- *    [floorDb] so low-level noise bins don't add up.
+ * 1. Short-time spectrum (Hann window, about 23 ms frames every 5 ms), as log magnitude. Each bin
+ *    is clipped at its own background level plus 10 dB (and never below [floorDb]), so steady
+ *    background noise doesn't add up.
  * 2. Spectral flux: for each frame, the sum over frequency bins of the **positive** changes in log
  *    magnitude since the previous frame. Decaying notes give no flux; new notes give a peak.
  * 3. Adaptive threshold: a moving median of the flux over ±[medianWindowSeconds], times
@@ -50,7 +51,7 @@ class OnsetDetector(
     fun flux(samples: FloatArray): DoubleArray {
         if (samples.isEmpty()) return DoubleArray(0)
         val spectrogram = Stft.compute(samples, sampleRate, frameSize, hopSize)
-        val floor = floorDb.toFloat()
+        val floors = binFloors(spectrogram.magnitudesDb)
         val flux = DoubleArray(spectrogram.frameCount)
         for (t in 1 until spectrogram.frameCount) {
             val previous = spectrogram.magnitudesDb[t - 1]
@@ -58,12 +59,28 @@ class OnsetDetector(
             var sum = 0.0
             for (bin in current.indices) {
                 // dB / 20 is log10 of the magnitude.
-                val rise = (max(current[bin], floor) - max(previous[bin], floor)) / 20.0
+                val rise = (max(current[bin], floors[bin]) - max(previous[bin], floors[bin])) / 20.0
                 if (rise > 0) sum += rise
             }
             flux[t] = sum
         }
         return flux
+    }
+
+    /**
+     * Per-bin clipping level: [floorDb], or the bin's steady background level plus
+     * [NOISE_MARGIN_DB] if that is higher. The background level is a low percentile of the bin
+     * over time, so steady noise (hiss, hum, a fan) is clipped away instead of adding flux.
+     */
+    private fun binFloors(magnitudesDb: Array<FloatArray>): FloatArray {
+        val bins = magnitudesDb.firstOrNull()?.size ?: return FloatArray(0)
+        val column = FloatArray(magnitudesDb.size)
+        return FloatArray(bins) { bin ->
+            for (t in magnitudesDb.indices) column[t] = magnitudesDb[t][bin]
+            column.sort()
+            val background = column[(column.size * NOISE_PERCENTILE).toInt().coerceAtMost(column.size - 1)]
+            max(floorDb.toFloat(), background + NOISE_MARGIN_DB)
+        }
     }
 
     /** Time of frame [t]'s flux value: halfway between the centres of frames t − 1 and t. */
@@ -102,5 +119,11 @@ class OnsetDetector(
     private companion object {
         /** Below this, the recording has no onsets at all (silence). */
         const val MIN_PEAK_FLUX = 1e-6
+
+        /** Percentile of a bin's level over time taken as its background noise. */
+        const val NOISE_PERCENTILE = 0.2
+
+        /** How far above its background a bin must rise before it counts. */
+        const val NOISE_MARGIN_DB = 10f
     }
 }
