@@ -17,7 +17,7 @@ A beginner piano trainer for Android and iOS phones. Students learn real songs p
 
 ## Building
 
-Requires JDK 21 and the Android SDK (point `sdk.dir` in `local.properties` at it). Building iOS also requires a Mac with Xcode. A full setup guide is coming in [#4](https://github.com/rudi-cilibrasi/musicprompt/issues/4).
+Requires JDK 21 and the Android SDK (point `sdk.dir` in `local.properties` at it). Building iOS also requires a Mac with Xcode. See the [developer setup guide](docs/DEVELOPING.md) for step-by-step instructions on macOS, Windows and Linux.
 
 - Android app: `./gradlew :androidApp:assembleDebug`
 - iOS app: open `iosApp/iosApp.xcodeproj` in Xcode and run.
