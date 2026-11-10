@@ -121,6 +121,7 @@ fun AppNavigation(
                 LessonScreen(
                     songId = route.songId,
                     phraseIndex = route.phraseIndex,
+                    container = container,
                     onAttemptAnalyzed = { attemptId -> navController.navigate(PhraseResultsRoute(attemptId)) },
                 )
             }

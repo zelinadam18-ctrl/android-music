@@ -1,0 +1,86 @@
+package io.github.rudicilibrasi.pianotrainer.ui.screens
+
+import io.github.rudicilibrasi.pianotrainer.core.progress.Progression
+import io.github.rudicilibrasi.pianotrainer.core.progress.SongProgress
+import io.github.rudicilibrasi.pianotrainer.data.SongCatalog
+import io.github.rudicilibrasi.pianotrainer.database.StartLesson
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+
+class LessonTest {
+
+    private val dispatcher = StandardTestDispatcher()
+
+    @BeforeTest
+    fun setUp() = Dispatchers.setMain(dispatcher)
+
+    @AfterTest
+    fun tearDown() = Dispatchers.resetMain()
+
+    private val catalog = SongCatalog { path ->
+        when (path) {
+            "files/songs/index.json" -> """{ "songs": ["twinkle"] }"""
+            "files/songs/twinkle.json" -> """{ "id": "twinkle", "title": "Twinkle", "tempoBpm": 120, "timeSignature": "4/4",
+                "key": "C major", "source": "traditional", "license": "Public domain", "sourceVerified": false,
+                "phrases": ["C4/1 C4/1 G4/1 G4/1 A4/1 A4/1 G4/2", "F4/1 F4/1 E4/1 R/1 D4/1 D4/1 C4/2"] }"""
+            else -> throw IllegalStateException("missing resource $path")
+        }.encodeToByteArray()
+    }
+
+    private fun lesson(phrase: Int, progress: FakeProgress = FakeProgress()) =
+        LessonViewModel("twinkle", phrase, catalog, StartLesson(progress), analysisDispatcher = dispatcher)
+
+    @Test
+    fun theFirstPhraseOpensWithEverythingFromTheSongModel() = runTest {
+        val viewModel = lesson(0)
+        testScheduler.advanceUntilIdle()
+        val ready = assertIs<LessonUiState.Ready>(viewModel.uiState.value)
+        val lesson = ready.lesson
+        assertEquals("Twinkle", lesson.title)
+        assertEquals("Phrase 1 of 2", lesson.phraseText)
+        assertEquals("7 notes", lesson.noteCountText)
+        assertEquals("C4 — C4 — G4 — G4 — A4 — A4 — G4", lesson.lettersText)
+        // The reference was synthesized and analysed for the graphs, and finds the same notes.
+        val reference = assertNotNull(ready.reference)
+        assertEquals(lesson.phrase.notes.map { it.pitch }, reference.notes.map { it.pitch })
+    }
+
+    @Test
+    fun aLockedPhraseCannotBeOpenedByAnyRoute() = runTest {
+        val viewModel = lesson(1)
+        testScheduler.advanceUntilIdle()
+        val unavailable = assertIs<LessonUiState.Unavailable>(viewModel.uiState.value)
+        assertEquals("Phrase 2 is locked. Score 50 or more on phrase 1 to unlock it.", unavailable.message)
+    }
+
+    @Test
+    fun anUnlockedPhraseOpensAndLeavesRestsOutOfTheLetters() = runTest {
+        val progress = FakeProgress()
+        val song = catalog.loadSongs().single()
+        progress.set("twinkle", Progression.recordScore(SongProgress.initial(song), 0, 60).progress)
+        val viewModel = lesson(1, progress)
+        testScheduler.advanceUntilIdle()
+        val lesson = assertIs<LessonUiState.Ready>(viewModel.uiState.value).lesson
+        assertEquals("F4 — F4 — E4 — D4 — D4 — C4", lesson.lettersText)
+        assertEquals("6 notes", lesson.noteCountText)
+    }
+
+    @Test
+    fun aMissingPhraseOrSongIsUnavailable() = runTest {
+        val viewModel = lesson(7)
+        testScheduler.advanceUntilIdle()
+        assertIs<LessonUiState.Unavailable>(viewModel.uiState.value)
+        val missing = LessonViewModel("nope", 0, catalog, StartLesson(FakeProgress()), dispatcher)
+        testScheduler.advanceUntilIdle()
+        assertIs<LessonUiState.Unavailable>(missing.uiState.value)
+    }
+}
