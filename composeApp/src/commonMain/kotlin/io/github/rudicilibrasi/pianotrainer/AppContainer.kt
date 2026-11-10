@@ -8,6 +8,7 @@ import io.github.rudicilibrasi.pianotrainer.database.PianoDatabase
 import io.github.rudicilibrasi.pianotrainer.database.ProgressReader
 import io.github.rudicilibrasi.pianotrainer.database.ProgressRepository
 import io.github.rudicilibrasi.pianotrainer.database.RecordAttempt
+import io.github.rudicilibrasi.pianotrainer.database.RecordFreePractice
 import io.github.rudicilibrasi.pianotrainer.database.StartLesson
 import io.github.rudicilibrasi.pianotrainer.database.buildPianoDatabase
 
@@ -38,4 +39,7 @@ class AppContainer(databaseBuilder: RoomDatabase.Builder<PianoDatabase>) {
     val startLesson: StartLesson by lazy { StartLesson(progressRepository) }
 
     val recordAttempt: RecordAttempt by lazy { RecordAttempt(database, attemptRepository, progressRepository) }
+
+    /** Saves Free Practice attempts; never touches progress. */
+    val recordFreePractice: RecordFreePractice by lazy { RecordFreePractice(attemptRepository) }
 }
