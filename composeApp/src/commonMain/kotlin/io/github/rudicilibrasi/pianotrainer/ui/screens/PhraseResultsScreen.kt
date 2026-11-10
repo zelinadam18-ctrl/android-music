@@ -37,7 +37,8 @@ import io.github.rudicilibrasi.pianotrainer.database.AttemptMode
 import io.github.rudicilibrasi.pianotrainer.database.ProgressReader
 import io.github.rudicilibrasi.pianotrainer.database.StartLesson
 import io.github.rudicilibrasi.pianotrainer.database.StartLessonResult
-import io.github.rudicilibrasi.pianotrainer.ui.graphs.ComparisonGraph
+import io.github.rudicilibrasi.pianotrainer.ui.graphs.ComparisonInput
+import io.github.rudicilibrasi.pianotrainer.ui.graphs.GraphSwitcher
 import io.github.rudicilibrasi.pianotrainer.ui.staff.ComparedStaves
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -240,8 +241,9 @@ fun PhraseResultsContent(state: PhraseResultsState, message: String?, onRetry: (
         val song = state.song
         if (phrase != null && comparison != null && song != null) {
             ComparedStaves(phrase, comparison.alignment, state.attempt.detectedNotes, timeSignature = song.timeSignature, pickupBeats = song.pickupBeats)
-            ComparisonGraph(phrase, song.tempoBpm, state.attempt.detectedNotes, comparison)
+            // The per-recording graphs join once the reference (#21) and the recording (#20) can be analysed here.
+            GraphSwitcher(reference = null, yours = null, comparison = ComparisonInput(phrase, song.tempoBpm, state.attempt.detectedNotes, comparison))
         }
-        // Playback of the reference and the recording (#22, #23) and the other graphs (#61) go here.
+        // Playback of the reference and the recording (#22, #23) goes here.
     }
 }
