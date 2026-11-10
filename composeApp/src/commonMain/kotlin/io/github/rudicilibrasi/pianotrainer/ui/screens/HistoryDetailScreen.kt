@@ -1,30 +1,192 @@
 package io.github.rudicilibrasi.pianotrainer.ui.screens
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.github.rudicilibrasi.pianotrainer.AppContainer
+import io.github.rudicilibrasi.pianotrainer.core.analysis.AudioAnalyzer
+import io.github.rudicilibrasi.pianotrainer.core.music.NoteEvent
+import io.github.rudicilibrasi.pianotrainer.core.music.Song
+import io.github.rudicilibrasi.pianotrainer.core.music.TimeSignature
+import io.github.rudicilibrasi.pianotrainer.data.SongCatalog
+import io.github.rudicilibrasi.pianotrainer.database.Attempt
+import io.github.rudicilibrasi.pianotrainer.database.AttemptHistory
+import io.github.rudicilibrasi.pianotrainer.ui.staff.StaffView
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.datetime.TimeZone
+import kotlin.math.roundToInt
 
-data class HistoryDetailUiState(val attemptId: Long)
+/**
+ * Everything the saved-attempt screen shows, taken only from what was saved with the attempt,
+ * so an old attempt always looks exactly as it did.
+ */
+data class HistoryDetailState(
+    val title: String,
+    val dateText: String,
+    val score: Int,
+    val components: List<Pair<String, String>>,
+    val expectedLetters: String,
+    val detectedLetters: String,
+    val expectedStaff: List<NoteEvent>,
+    val detectedStaff: List<NoteEvent>,
+    val timeSignature: TimeSignature?,
+    val phraseStartBeat: Double,
+    val pickupBeats: Double,
+    val summary: String,
+    val wentWell: List<String>,
+    val toImprove: List<String>,
+    /** Shown when the attempt was analysed by an older (or newer) version than this app's. */
+    val versionNote: String?,
+) {
+    companion object {
+        fun of(attempt: Attempt, songs: Map<String, Song>, timeZone: TimeZone): HistoryDetailState {
+            val song = attempt.songId?.let(songs::get)
+            val phrase = attempt.phraseIndex?.let { song?.phrases?.getOrNull(it) }
+            // The phrase's real rhythm when its notes still match what was saved; plain quarter notes otherwise.
+            val savedPhrase = phrase?.takeIf { it.notes.map { note -> note.pitch } == attempt.expectedNotes }
+            val expectedStaff = savedPhrase?.events ?: attempt.expectedNotes.map { NoteEvent(it, 1.0) }
+            val scores = attempt.scores
+            fun percent(value: Double) = "${(value * 100).roundToInt()}%"
+            return HistoryDetailState(
+                title = HistoryRowState.of(attempt, songs, timeZone).title,
+                dateText = formatDateTime(attempt.createdAt, timeZone),
+                score = scores.score,
+                components = listOfNotNull(
+                    "Notes" to percent(scores.noteAccuracy),
+                    "Order" to percent(scores.orderAccuracy),
+                    "Timing" to percent(scores.timingAccuracy),
+                    "Tempo" to percent(scores.tempoAccuracy),
+                    scores.tempoRatio?.let { "Speed" to "${(it * 100).roundToInt()}% of the reference's length" },
+                ),
+                expectedLetters = attempt.expectedNotes.joinToString(" — ") { it.label },
+                detectedLetters = if (attempt.detectedNotes.isEmpty()) {
+                    "No notes heard"
+                } else {
+                    attempt.detectedNotes.joinToString(" — ") { if (it.isReliable) it.pitch!!.label else "?" }
+                },
+                expectedStaff = expectedStaff,
+                // Detected notes as quarter notes: their exact lengths aren't written as rhythm.
+                detectedStaff = attempt.detectedNotes.mapNotNull { note -> note.pitch?.takeIf { note.isReliable }?.let { NoteEvent(it, 1.0) } },
+                timeSignature = savedPhrase?.let { song?.timeSignature },
+                phraseStartBeat = savedPhrase?.startBeat ?: 0.0,
+                pickupBeats = if (savedPhrase != null) song?.pickupBeats ?: 0.0 else 0.0,
+                summary = attempt.feedback.summary,
+                wentWell = attempt.feedback.wentWell,
+                toImprove = attempt.feedback.toImprove,
+                versionNote = if (attempt.analysisVersion != AudioAnalyzer.ANALYSIS_VERSION) {
+                    "These are the scores saved at the time. The analysis has changed since " +
+                        "(version ${attempt.analysisVersion} then, ${AudioAnalyzer.ANALYSIS_VERSION} now), so a new attempt may score differently."
+                } else {
+                    null
+                },
+            )
+        }
+    }
+}
 
-class HistoryDetailViewModel(attemptId: Long) : ViewModel() {
-    private val _uiState = MutableStateFlow(HistoryDetailUiState(attemptId))
+sealed interface HistoryDetailUiState {
+    data object Loading : HistoryDetailUiState
+    data class Loaded(val detail: HistoryDetailState) : HistoryDetailUiState
+    data class Error(val message: String) : HistoryDetailUiState
+}
+
+/**
+ * Strictly read-only (spec §13): it only gets [AttemptHistory], so it can't record an attempt or
+ * change progress.
+ */
+class HistoryDetailViewModel(
+    private val attemptId: Long,
+    private val catalog: SongCatalog,
+    private val history: AttemptHistory,
+    private val timeZone: TimeZone = TimeZone.currentSystemDefault(),
+) : ViewModel() {
+    private val _uiState = MutableStateFlow<HistoryDetailUiState>(HistoryDetailUiState.Loading)
     val uiState: StateFlow<HistoryDetailUiState> = _uiState.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            _uiState.value = try {
+                val attempt = history.get(attemptId)
+                if (attempt == null) {
+                    HistoryDetailUiState.Error("This attempt isn't available any more.")
+                } else {
+                    // A song that no longer loads shouldn't hide the saved results.
+                    val songs = runCatching { catalog.loadSongs().associateBy { it.id } }.getOrDefault(emptyMap())
+                    HistoryDetailUiState.Loaded(HistoryDetailState.of(attempt, songs, timeZone))
+                }
+            } catch (e: Exception) {
+                HistoryDetailUiState.Error("This attempt couldn't be loaded.\n(${e.message})")
+            }
+        }
+    }
 }
 
 @Composable
 fun HistoryDetailScreen(
     attemptId: Long,
-    viewModel: HistoryDetailViewModel = viewModel { HistoryDetailViewModel(attemptId) },
+    container: AppContainer,
+    viewModel: HistoryDetailViewModel = viewModel { HistoryDetailViewModel(attemptId, container.songCatalog, container.attemptHistory) },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    PlaceholderScreen(
-        heading = "Saved attempt",
-        issueNumber = 63,
-        details = listOf("Attempt: ${state.attemptId}"),
-    )
+    when (val current = state) {
+        HistoryDetailUiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        is HistoryDetailUiState.Error -> Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+            Text(current.message, textAlign = TextAlign.Center)
+        }
+        is HistoryDetailUiState.Loaded -> HistoryDetailContent(current.detail)
+    }
+}
+
+@Composable
+fun HistoryDetailContent(detail: HistoryDetailState) {
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(detail.title, style = MaterialTheme.typography.headlineSmall)
+        Text(detail.dateText, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("${detail.score}/100", style = MaterialTheme.typography.displaySmall)
+        detail.components.forEach { (name, value) -> Text("$name: $value", style = MaterialTheme.typography.bodyLarge) }
+        detail.versionNote?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.tertiary) }
+
+        Text("Expected", style = MaterialTheme.typography.titleMedium)
+        Text(detail.expectedLetters, style = MaterialTheme.typography.bodyLarge)
+        if (detail.expectedStaff.isNotEmpty()) {
+            StaffView(detail.expectedStaff, timeSignature = detail.timeSignature, phraseStartBeat = detail.phraseStartBeat, pickupBeats = detail.pickupBeats)
+        }
+        Text("You played", style = MaterialTheme.typography.titleMedium)
+        Text(detail.detectedLetters, style = MaterialTheme.typography.bodyLarge)
+        if (detail.detectedStaff.isNotEmpty()) StaffView(detail.detectedStaff)
+
+        Text(detail.summary, style = MaterialTheme.typography.titleMedium)
+        if (detail.wentWell.isNotEmpty()) {
+            Text("What went well", style = MaterialTheme.typography.titleSmall)
+            detail.wentWell.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium) }
+        }
+        if (detail.toImprove.isNotEmpty()) {
+            Text("What to improve", style = MaterialTheme.typography.titleSmall)
+            detail.toImprove.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium) }
+        }
+        // Graphs (#61) and playback of the saved recordings (#22, #23) go here.
+    }
 }

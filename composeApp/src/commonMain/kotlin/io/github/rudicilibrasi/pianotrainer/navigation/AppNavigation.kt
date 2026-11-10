@@ -134,7 +134,7 @@ fun AppNavigation(
                 HistoryScreen(container, onOpenAttempt = { attemptId -> navController.navigate(HistoryDetailRoute(attemptId)) })
             }
             composable<HistoryDetailRoute> { entry ->
-                HistoryDetailScreen(attemptId = entry.toRoute<HistoryDetailRoute>().attemptId)
+                HistoryDetailScreen(attemptId = entry.toRoute<HistoryDetailRoute>().attemptId, container = container)
             }
             composable<FreePracticeRoute> {
                 FreePracticeScreen()
