@@ -16,7 +16,7 @@ import kotlinx.coroutines.IO
  * Android, `databaseBuilder()` on iOS.
  */
 @Database(
-    entities = [MetadataEntity::class, SongProgressEntity::class, PhraseProgressEntity::class],
+    entities = [MetadataEntity::class, SongProgressEntity::class, PhraseProgressEntity::class, AttemptEntity::class],
     version = 1,
     exportSchema = true,
 )
@@ -25,6 +25,8 @@ abstract class PianoDatabase : RoomDatabase() {
     abstract fun metadataDao(): MetadataDao
 
     abstract fun progressDao(): ProgressDao
+
+    abstract fun attemptDao(): AttemptDao
 
     companion object {
         const val FILE_NAME = "piano_trainer.db"

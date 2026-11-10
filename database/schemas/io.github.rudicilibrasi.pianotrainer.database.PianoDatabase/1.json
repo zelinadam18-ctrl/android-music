@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "3bec356600784dea071ac66b08fc8673",
+    "identityHash": "fd2c4cd7e124f093ad48a4955ff92938",
     "entities": [
       {
         "tableName": "metadata",
@@ -154,11 +154,138 @@
             "phraseIndex"
           ]
         }
+      },
+      {
+        "tableName": "attempt",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `songId` TEXT, `phraseIndex` INTEGER, `createdAt` INTEGER NOT NULL, `mode` TEXT NOT NULL, `expectedNotesJson` TEXT NOT NULL, `detectedNotesJson` TEXT NOT NULL, `referenceWavPath` TEXT, `userWavPath` TEXT, `score` INTEGER NOT NULL, `rawScore` REAL NOT NULL, `noteAccuracy` REAL NOT NULL, `orderAccuracy` REAL NOT NULL, `timingAccuracy` REAL NOT NULL, `tempoAccuracy` REAL NOT NULL, `tempoRatio` REAL, `feedbackJson` TEXT NOT NULL, `analysisVersion` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "songId",
+            "columnName": "songId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "phraseIndex",
+            "columnName": "phraseIndex",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mode",
+            "columnName": "mode",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "expectedNotesJson",
+            "columnName": "expectedNotesJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "detectedNotesJson",
+            "columnName": "detectedNotesJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "referenceWavPath",
+            "columnName": "referenceWavPath",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "userWavPath",
+            "columnName": "userWavPath",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "score",
+            "columnName": "score",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rawScore",
+            "columnName": "rawScore",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "noteAccuracy",
+            "columnName": "noteAccuracy",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "orderAccuracy",
+            "columnName": "orderAccuracy",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timingAccuracy",
+            "columnName": "timingAccuracy",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tempoAccuracy",
+            "columnName": "tempoAccuracy",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tempoRatio",
+            "columnName": "tempoRatio",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "feedbackJson",
+            "columnName": "feedbackJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "analysisVersion",
+            "columnName": "analysisVersion",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_attempt_songId_createdAt",
+            "unique": false,
+            "columnNames": [
+              "songId",
+              "createdAt"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_attempt_songId_createdAt` ON `${TABLE_NAME}` (`songId`, `createdAt`)"
+          }
+        ]
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '3bec356600784dea071ac66b08fc8673')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'fd2c4cd7e124f093ad48a4955ff92938')"
     ]
   }
 }
