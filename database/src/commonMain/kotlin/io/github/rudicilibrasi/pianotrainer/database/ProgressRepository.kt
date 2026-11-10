@@ -17,23 +17,23 @@ import kotlinx.coroutines.flow.distinctUntilChanged
  *
  * Only the use-case that records attempts (#53) should call [save].
  */
-class ProgressRepository(private val dao: ProgressDao) {
+class ProgressRepository(private val dao: ProgressDao) : ProgressReader {
 
     /** Progress on [song], updating whenever it is saved. */
-    fun observe(song: Song): Flow<SongProgress> =
+    override fun observe(song: Song): Flow<SongProgress> =
         dao.observePhrases(song.id).combine(dao.observeSong(song.id)) { phrases, summary ->
             toSongProgress(song, phrases, summary)
         }.distinctUntilChanged()
 
     /** Progress on each of [songs], keyed by song id, updating whenever any of it is saved. */
-    fun observeAll(songs: List<Song>): Flow<Map<String, SongProgress>> =
+    override fun observeAll(songs: List<Song>): Flow<Map<String, SongProgress>> =
         dao.observeAllPhrases().combine(dao.observeSongs()) { phrases, summaries ->
             val phrasesBySong = phrases.groupBy { it.songId }
             val summaryBySong = summaries.associateBy { it.songId }
             songs.associate { song -> song.id to toSongProgress(song, phrasesBySong[song.id].orEmpty(), summaryBySong[song.id]) }
         }.distinctUntilChanged()
 
-    suspend fun get(song: Song): SongProgress = toSongProgress(song, dao.getPhrases(song.id), dao.getSong(song.id))
+    override suspend fun get(song: Song): SongProgress = toSongProgress(song, dao.getPhrases(song.id), dao.getSong(song.id))
 
     /** Dates on a song's saved progress (milliseconds since the Unix epoch). */
     suspend fun dates(songId: String): ProgressDates? = dao.getSong(songId)?.let {

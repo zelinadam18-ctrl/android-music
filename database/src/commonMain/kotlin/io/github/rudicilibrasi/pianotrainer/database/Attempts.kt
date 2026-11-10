@@ -126,21 +126,21 @@ interface AttemptDao {
  * Saved attempts (spec §13). Attempts are only ever added, never changed, so history shows each
  * one exactly as it was.
  */
-class AttemptRepository(private val dao: AttemptDao) {
+class AttemptRepository(private val dao: AttemptDao) : AttemptHistory {
 
     /** Saves [attempt] and returns its id. */
     suspend fun insert(attempt: NewAttempt): Long = dao.insert(attempt.toEntity())
 
-    suspend fun get(id: Long): Attempt? = dao.get(id)?.toAttempt()
+    override suspend fun get(id: Long): Attempt? = dao.get(id)?.toAttempt()
 
     /** Every attempt, newest first. */
-    fun observeAll(): Flow<List<Attempt>> = dao.observeAll().map { rows -> rows.map { it.toAttempt() } }
+    override fun observeAll(): Flow<List<Attempt>> = dao.observeAll().map { rows -> rows.map { it.toAttempt() } }
 
     /** Attempts on one song, newest first. */
-    fun observeForSong(songId: String): Flow<List<Attempt>> = dao.observeForSong(songId).map { rows -> rows.map { it.toAttempt() } }
+    override fun observeForSong(songId: String): Flow<List<Attempt>> = dao.observeForSong(songId).map { rows -> rows.map { it.toAttempt() } }
 
     /** Attempts on one phrase, newest first, for comparing with earlier attempts (#65). */
-    fun observeForPhrase(songId: String, phraseIndex: Int): Flow<List<Attempt>> =
+    override fun observeForPhrase(songId: String, phraseIndex: Int): Flow<List<Attempt>> =
         dao.observeForPhrase(songId, phraseIndex).map { rows -> rows.map { it.toAttempt() } }
 }
 
