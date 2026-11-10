@@ -105,3 +105,26 @@ class OnsetDetectorTest {
         assertEquals(null, OnsetCheck.check(phrase("C4/1 C4/1 G4/1 G4/1"), 100.0, sampleRate = 16000))
     }
 }
+
+class OnsetAtStartTest {
+
+    @Test
+    fun aNoteAtTheVeryFirstSampleHasAnOnset() {
+        // Reference audio starts right away, with no silence before the first note.
+        val samples = Synthesizer(44100).render(listOf(SynthNote(Pitch.parse("C4"), 0.0, 0.5), SynthNote(Pitch.parse("C4"), 0.6, 0.5)), 1.2)
+        val onsets = OnsetDetector(44100).detect(samples)
+        assertEquals(2, onsets.size, "onsets $onsets")
+        assertTrue(onsets[0].timeSeconds < 0.03, "first onset at ${onsets[0].timeSeconds} s")
+        assertTrue(abs(onsets[1].timeSeconds - 0.6) < 0.03)
+    }
+
+    @Test
+    fun aPhraseRenderedWithoutLeadInIsDetectedExactly() {
+        val phrase = Phrase(0, SongFormat.parseEvents("C4/1 C4/1 G4/1 G4/1 A4/1 A4/1 G4/2"), 0.0)
+        val samples = Synthesizer(44100).renderPhrase(phrase, 120.0)
+        val starts = phrase.timedEvents(120.0).filter { !it.event.isRest }.map { it.startMs / 1000 }
+        val onsets = OnsetDetector(44100).detect(samples).map { it.timeSeconds }
+        assertEquals(starts.size, onsets.size, "onsets $onsets")
+        starts.zip(onsets).forEach { (s, o) -> assertTrue(abs(s - o) < 0.03, "expected $s, found $o") }
+    }
+}

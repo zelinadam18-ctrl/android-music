@@ -152,3 +152,15 @@ class NoteDetectorTest {
         assertEquals(null, NoteCheck.check(notes, NoteDetector(rate).detect(samples)))
     }
 }
+
+class NoteDetectorAtStartTest {
+
+    @Test
+    fun referenceAudioThatStartsImmediatelyIsDetectedExactly() {
+        val phrase = Phrase(0, SongFormat.parseEvents("C4/1 C4/1 G4/1 G4/1 A4/1 A4/1 G4/2"), 0.0)
+        val samples = Synthesizer(44100).renderPhrase(phrase, 100.0)
+        val notes = NoteDetector(44100).detect(samples)
+        assertEquals(phrase.notes.map { it.pitch }, notes.map { it.pitch })
+        assertTrue(notes.none { it.uncertain })
+    }
+}

@@ -47,10 +47,18 @@ class OnsetDetector(
     /** About 5 ms. */
     val hopSize: Int = (sampleRate * 0.005).roundToInt().coerceIn(1, frameSize)
 
-    /** Spectral flux per frame; index 0 is always 0. Exposed for graphs and debugging. */
+    /** Silence added before the recording, so a note at the very first sample still has an onset. */
+    private val leadIn: Int = frameSize
+
+    /**
+     * Spectral flux per frame, with [leadIn] samples of silence in front so a note that starts
+     * right at the beginning (as reference audio does) rises from silence like any other. Index 0
+     * is always 0; use [fluxTimeSeconds] for times. Exposed for graphs and debugging.
+     */
     fun flux(samples: FloatArray): DoubleArray {
         if (samples.isEmpty()) return DoubleArray(0)
-        val spectrogram = Stft.compute(samples, sampleRate, frameSize, hopSize)
+        val padded = FloatArray(leadIn + samples.size).also { samples.copyInto(it, destinationOffset = leadIn) }
+        val spectrogram = Stft.compute(padded, sampleRate, frameSize, hopSize)
         val floors = binFloors(spectrogram.magnitudesDb)
         val flux = DoubleArray(spectrogram.frameCount)
         for (t in 1 until spectrogram.frameCount) {
@@ -84,7 +92,7 @@ class OnsetDetector(
     }
 
     /** Time of frame [t]'s flux value: halfway between the centres of frames t − 1 and t. */
-    fun fluxTimeSeconds(t: Int): Double = ((t - 0.5) * hopSize + frameSize / 2.0) / sampleRate
+    fun fluxTimeSeconds(t: Int): Double = (((t - 0.5) * hopSize + frameSize / 2.0 - leadIn) / sampleRate).coerceAtLeast(0.0)
 
     fun detect(samples: FloatArray): List<Onset> {
         val flux = flux(samples)
