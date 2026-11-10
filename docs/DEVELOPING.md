@@ -63,9 +63,10 @@ Run these from the repo root. On Windows use `gradlew.bat` (or `.\gradlew` in Po
 | Run iOS (Mac) | Open `iosApp/iosApp.xcodeproj` in Xcode, pick a simulator or phone, press Run |
 | `core` tests (any OS) | `./gradlew :core:jvmTest` |
 | Shared UI tests (any OS) | `./gradlew :composeApp:testAndroidHostTest` |
+| Database tests | `./gradlew :database:jvmTest` (skipped on Intel Macs, see below) |
 | Android lint | `./gradlew :androidApp:lintDebug` |
-| Everything CI runs on Linux | `./gradlew :core:jvmTest :core:testAndroidHostTest :composeApp:testAndroidHostTest :androidApp:lintDebug :androidApp:assembleDebug` |
-| iOS simulator tests (Mac) | `./gradlew :core:iosSimulatorArm64Test :composeApp:iosSimulatorArm64Test` |
+| Everything CI runs on Linux | `./gradlew :core:jvmTest :core:testAndroidHostTest :database:jvmTest :composeApp:testAndroidHostTest :androidApp:lintDebug :androidApp:assembleDebug` |
+| iOS simulator tests (Mac) | `./gradlew :core:iosSimulatorArm64Test :database:iosSimulatorArm64Test :composeApp:iosSimulatorArm64Test` |
 
 In Android Studio you can also run the `androidApp` configuration directly.
 
@@ -84,4 +85,5 @@ Emulator audio is resampled and filtered by the host, so it is only good enough 
 - **"Unsupported class file major version" or a Gradle JVM error**: Gradle is running on the wrong JDK. Use JDK 21 (`JAVA_HOME`, or *Settings → Build Tools → Gradle → Gradle JDK* in Android Studio).
 - **Licences not accepted**: run `sdkmanager --licenses` (in `<sdk>/cmdline-tools/latest/bin`) and answer `y`.
 - **`xcodebuild` says the active developer directory is a command-line tools instance**: run the `xcode-select -s` command from section 2.
+- **Database tests are skipped on an Intel Mac**: the bundled SQLite driver has no JVM binary for Intel Macs, so `:database:jvmTest` skips its tests there. They run on Linux (CI), Windows and Apple-silicon Macs, and `:database:iosSimulatorArm64Test` runs them on the iOS simulator.
 - **First iOS build is slow**: Kotlin/Native downloads its toolchain into `~/.konan` once. Later builds are faster.

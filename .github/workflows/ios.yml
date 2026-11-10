@@ -10,6 +10,7 @@ on:
       - "composeApp/src/iosMain/**"
       - "composeApp/build.gradle.kts"
       - "core/build.gradle.kts"
+      - "database/**"
       - "gradle/**"
       - "build.gradle.kts"
       - "settings.gradle.kts"
@@ -22,6 +23,7 @@ on:
       - "composeApp/src/iosMain/**"
       - "composeApp/build.gradle.kts"
       - "core/build.gradle.kts"
+      - "database/**"
       - "gradle/**"
       - "build.gradle.kts"
       - "settings.gradle.kts"
@@ -60,7 +62,7 @@ jobs:
           key: konan-${{ runner.os }}-${{ hashFiles('gradle/libs.versions.toml') }}
 
       - name: Shared tests on the iOS simulator
-        run: ./gradlew --console=plain :core:iosSimulatorArm64Test :composeApp:iosSimulatorArm64Test
+        run: ./gradlew --console=plain :core:iosSimulatorArm64Test :database:iosSimulatorArm64Test :composeApp:iosSimulatorArm64Test
 
       - name: Build the iOS app for the simulator
         run: >

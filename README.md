@@ -11,6 +11,7 @@ A beginner piano trainer for Android and iOS phones. Students learn real songs p
 ## Project layout
 
 - `core/`: pure Kotlin logic shared by every platform (music model, DSP, scoring, progression). No UI or platform APIs.
+- `database/`: the local database (Room for Kotlin Multiplatform with bundled SQLite). Schema files are committed in `database/schemas/`.
 - `composeApp/`: the shared Compose Multiplatform UI, plus Android- and iOS-specific code in `androidMain` and `iosMain`. Built as the `ComposeApp` framework for iOS.
 - `androidApp/`: the Android app shell that hosts the shared UI.
 - `iosApp/`: the Xcode project that hosts the shared UI on iOS.

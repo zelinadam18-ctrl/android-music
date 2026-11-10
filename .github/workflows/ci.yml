@@ -35,6 +35,7 @@ jobs:
           ./gradlew --console=plain
           :core:jvmTest
           :core:testAndroidHostTest
+          :database:jvmTest
           :composeApp:testAndroidHostTest
           :androidApp:lintDebug
           :androidApp:assembleDebug
