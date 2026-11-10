@@ -22,6 +22,9 @@ interface ProgressReader {
     fun observe(song: Song): Flow<SongProgress>
     fun observeAll(songs: List<Song>): Flow<Map<String, SongProgress>>
     suspend fun get(song: Song): SongProgress
+
+    /** When the song was started, its star earned and last attempted, or null if never saved. */
+    suspend fun dates(songId: String): ProgressDates?
 }
 
 sealed interface StartLessonResult {

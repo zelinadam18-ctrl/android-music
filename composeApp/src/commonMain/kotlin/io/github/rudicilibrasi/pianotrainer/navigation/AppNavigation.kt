@@ -128,7 +128,7 @@ fun AppNavigation(
                 PhraseResultsScreen(attemptId = entry.toRoute<PhraseResultsRoute>().attemptId)
             }
             composable<SongCompleteRoute> { entry ->
-                SongCompleteScreen(songId = entry.toRoute<SongCompleteRoute>().songId)
+                SongCompleteScreen(songId = entry.toRoute<SongCompleteRoute>().songId, container = container)
             }
             composable<HistoryRoute> {
                 HistoryScreen(container, onOpenAttempt = { attemptId -> navController.navigate(HistoryDetailRoute(attemptId)) })

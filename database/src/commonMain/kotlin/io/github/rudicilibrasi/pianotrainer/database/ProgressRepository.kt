@@ -36,7 +36,7 @@ class ProgressRepository(private val dao: ProgressDao) : ProgressReader {
     override suspend fun get(song: Song): SongProgress = toSongProgress(song, dao.getPhrases(song.id), dao.getSong(song.id))
 
     /** Dates on a song's saved progress (milliseconds since the Unix epoch). */
-    suspend fun dates(songId: String): ProgressDates? = dao.getSong(songId)?.let {
+    override suspend fun dates(songId: String): ProgressDates? = dao.getSong(songId)?.let {
         ProgressDates(startedAt = it.startedAt, starEarnedAt = it.starEarnedAt, lastAttemptAt = it.lastAttemptAt)
     }
 

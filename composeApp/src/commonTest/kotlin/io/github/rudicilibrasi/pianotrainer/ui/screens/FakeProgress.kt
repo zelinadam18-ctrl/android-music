@@ -2,6 +2,7 @@ package io.github.rudicilibrasi.pianotrainer.ui.screens
 
 import io.github.rudicilibrasi.pianotrainer.core.music.Song
 import io.github.rudicilibrasi.pianotrainer.core.progress.SongProgress
+import io.github.rudicilibrasi.pianotrainer.database.ProgressDates
 import io.github.rudicilibrasi.pianotrainer.database.ProgressReader
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,4 +22,12 @@ class FakeProgress : ProgressReader {
         saved.map { all -> songs.associate { it.id to (all[it.id] ?: SongProgress.initial(it)) } }
 
     override suspend fun get(song: Song): SongProgress = saved.value[song.id] ?: SongProgress.initial(song)
+
+    private val savedDates = HashMap<String, ProgressDates>()
+
+    fun setDates(songId: String, dates: ProgressDates) {
+        savedDates[songId] = dates
+    }
+
+    override suspend fun dates(songId: String): ProgressDates? = savedDates[songId]
 }
