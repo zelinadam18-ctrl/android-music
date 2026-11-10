@@ -105,7 +105,7 @@ fun AppNavigation(
     ) { padding ->
         NavHost(navController, startDestination = SongsRoute, modifier = Modifier.padding(padding)) {
             composable<SongsRoute> {
-                SongsScreen(onOpenSong = { songId -> navController.navigate(SongDetailRoute(songId)) })
+                SongsScreen(container, onOpenSong = { songId -> navController.navigate(SongDetailRoute(songId)) })
             }
             composable<SongDetailRoute> { entry ->
                 val route = entry.toRoute<SongDetailRoute>()
@@ -113,6 +113,7 @@ fun AppNavigation(
                     songId = route.songId,
                     onPractisePhrase = { phraseIndex -> navController.navigate(LessonRoute(route.songId, phraseIndex)) },
                     onSongComplete = { navController.navigate(SongCompleteRoute(route.songId)) },
+                    container = container,
                 )
             }
             composable<LessonRoute> { entry ->

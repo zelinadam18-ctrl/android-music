@@ -6,6 +6,7 @@ import io.github.rudicilibrasi.pianotrainer.core.music.TimeSignature
 import io.github.rudicilibrasi.pianotrainer.core.progress.Progression
 import io.github.rudicilibrasi.pianotrainer.core.progress.SongProgress
 import io.github.rudicilibrasi.pianotrainer.data.SongCatalog
+import io.github.rudicilibrasi.pianotrainer.database.StartLesson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -92,9 +93,13 @@ class SongDetailViewModelTest {
         }.encodeToByteArray()
     }
 
+    private val progress = FakeProgress()
+
+    private fun viewModel(songId: String) = SongDetailViewModel(songId, catalog, progress, StartLesson(progress))
+
     @Test
     fun loadsTheSong() = runTest {
-        val viewModel = SongDetailViewModel("a", catalog)
+        val viewModel = viewModel("a")
         testScheduler.advanceUntilIdle()
         val state = assertIs<SongDetailUiState.Loaded>(viewModel.uiState.value)
         assertEquals("A Song", state.detail.title)
@@ -103,8 +108,37 @@ class SongDetailViewModelTest {
 
     @Test
     fun anUnknownSongIsAnError() = runTest {
-        val viewModel = SongDetailViewModel("missing", catalog)
+        val viewModel = viewModel("missing")
         testScheduler.advanceUntilIdle()
         assertIs<SongDetailUiState.Error>(viewModel.uiState.value)
+    }
+
+    @Test
+    fun scoring50OrMoreShowsTheNextPhraseUnlockedImmediately() = runTest {
+        val viewModel = viewModel("a")
+        testScheduler.advanceUntilIdle()
+        assertFalse(assertIs<SongDetailUiState.Loaded>(viewModel.uiState.value).detail.canOpen(1))
+
+        val song = catalog.loadSongs().single()
+        progress.set("a", Progression.recordScore(SongProgress.initial(song), 0, 50).progress)
+        testScheduler.advanceUntilIdle()
+        assertTrue(assertIs<SongDetailUiState.Loaded>(viewModel.uiState.value).detail.canOpen(1))
+    }
+
+    @Test
+    fun openingALockedPhraseShowsWhyAndDoesNotNavigate() = runTest {
+        val viewModel = viewModel("a")
+        testScheduler.advanceUntilIdle()
+        val opened = ArrayList<Int>()
+
+        viewModel.openPhrase(1) { opened += it }
+        testScheduler.advanceUntilIdle()
+        assertEquals(emptyList(), opened)
+        assertEquals("Phrase 2 is locked. Score 50 or more on phrase 1 to unlock it.", viewModel.message.value)
+
+        viewModel.openPhrase(0) { opened += it }
+        testScheduler.advanceUntilIdle()
+        assertEquals(listOf(0), opened)
+        assertEquals(null, viewModel.message.value)
     }
 }

@@ -89,7 +89,8 @@ class SongsViewModelTest {
             "key": "C major", "source": "traditional", "license": "Public domain", "sourceVerified": false,
             "phrases": ["C4/1 D4/1 E4/2"] }"""
         val viewModel = SongsViewModel(
-            catalog(
+            progress = FakeProgress(),
+            catalog = catalog(
                 mapOf(
                     "files/songs/index.json" to """{ "songs": ["b", "a"] }""",
                     "files/songs/a.json" to song("a", "A Song"),
@@ -105,8 +106,27 @@ class SongsViewModelTest {
     }
 
     @Test
+    fun cardsUpdateAsSoonAsProgressIsSaved() = runTest {
+        val song = """{ "id": "a", "title": "A Song", "tempoBpm": 100, "timeSignature": "4/4", "key": "C major",
+            "source": "traditional", "license": "Public domain", "sourceVerified": false,
+            "phrases": ["C4/1 D4/1 E4/2", "E4/1 D4/1 C4/2"] }"""
+        val progress = FakeProgress()
+        val catalog = catalog(mapOf("files/songs/index.json" to """{ "songs": ["a"] }""", "files/songs/a.json" to song))
+        val viewModel = SongsViewModel(catalog, progress)
+        testScheduler.advanceUntilIdle()
+        val loaded = catalog.loadSongs().single()
+
+        progress.set("a", Progression.recordScore(SongProgress.initial(loaded), 0, 80).progress)
+        testScheduler.advanceUntilIdle()
+        val card = assertIs<SongsUiState.Loaded>(viewModel.uiState.value).songs.single()
+        assertEquals(SongStatus.InProgress, card.status)
+        assertEquals("1 of 2 phrases completed", card.progressText)
+        assertEquals("Best score 80", card.bestScoreText)
+    }
+
+    @Test
     fun aBrokenCatalogShowsAnError() = runTest {
-        val viewModel = SongsViewModel(catalog(emptyMap()))
+        val viewModel = SongsViewModel(catalog(emptyMap()), FakeProgress())
         testScheduler.advanceUntilIdle()
         assertIs<SongsUiState.Error>(viewModel.uiState.value)
     }

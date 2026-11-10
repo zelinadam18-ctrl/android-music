@@ -1,5 +1,9 @@
 package io.github.rudicilibrasi.pianotrainer
 
 import androidx.compose.ui.window.ComposeUIViewController
+import io.github.rudicilibrasi.pianotrainer.database.databaseBuilder
 
-fun MainViewController() = ComposeUIViewController { App() }
+/** One container for the whole app process. */
+private val container by lazy { AppContainer(databaseBuilder()) }
+
+fun MainViewController() = ComposeUIViewController { App(container) }

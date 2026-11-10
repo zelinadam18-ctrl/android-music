@@ -36,7 +36,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.rudicilibrasi.pianotrainer.core.music.Song
 import io.github.rudicilibrasi.pianotrainer.core.progress.Progression
 import io.github.rudicilibrasi.pianotrainer.core.progress.SongProgress
+import io.github.rudicilibrasi.pianotrainer.AppContainer
 import io.github.rudicilibrasi.pianotrainer.data.SongCatalog
+import io.github.rudicilibrasi.pianotrainer.database.ProgressReader
+import io.github.rudicilibrasi.pianotrainer.database.StartLesson
+import io.github.rudicilibrasi.pianotrainer.database.StartLessonResult
 import io.github.rudicilibrasi.pianotrainer.ui.theme.PianoTrainerTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -79,7 +83,7 @@ data class SongDetailState(
     val continueText: String get() = "Continue with phrase ${currentPhraseIndex + 1}"
 
     companion object {
-        /** Without saved progress (until #53/#54), only phrase 1 is unlocked. */
+        /** Without saved progress, only phrase 1 is unlocked. */
         fun of(song: Song, progress: SongProgress = SongProgress.initial(song)) = SongDetailState(
             songId = song.id,
             title = song.title,
@@ -109,18 +113,51 @@ sealed interface SongDetailUiState {
 
 class SongDetailViewModel(
     private val songId: String,
-    private val catalog: SongCatalog = SongCatalog.bundled(),
+    private val catalog: SongCatalog,
+    private val progress: ProgressReader,
+    private val startLesson: StartLesson,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<SongDetailUiState>(SongDetailUiState.Loading)
     val uiState: StateFlow<SongDetailUiState> = _uiState.asStateFlow()
 
+    /** Why the last phrase the student tried to open couldn't be opened, until they open another. */
+    private val _message = MutableStateFlow<String?>(null)
+    val message: StateFlow<String?> = _message.asStateFlow()
+
+    private var song: Song? = null
+
     init {
         viewModelScope.launch {
-            _uiState.value = try {
-                val song = catalog.loadSongs().firstOrNull { it.id == songId }
-                if (song == null) SongDetailUiState.Error("This song isn't available.") else SongDetailUiState.Loaded(SongDetailState.of(song))
+            val loaded = try {
+                catalog.loadSongs().firstOrNull { it.id == songId }
             } catch (e: Exception) {
-                SongDetailUiState.Error("The song couldn't be loaded.\n(${e.message})")
+                _uiState.value = SongDetailUiState.Error("The song couldn't be loaded.\n(${e.message})")
+                return@launch
+            }
+            if (loaded == null) {
+                _uiState.value = SongDetailUiState.Error("This song isn't available.")
+                return@launch
+            }
+            song = loaded
+            // Saved progress: going back from a lesson shows newly unlocked phrases at once.
+            progress.observe(loaded).collect { _uiState.value = SongDetailUiState.Loaded(SongDetailState.of(loaded, it)) }
+        }
+    }
+
+    /**
+     * Opens [phraseIndex] through [StartLesson], which refuses locked phrases whatever the UI
+     * shows; [onReady] is called only when the lesson may start.
+     */
+    fun openPhrase(phraseIndex: Int, onReady: (Int) -> Unit) {
+        val current = song ?: return
+        viewModelScope.launch {
+            when (val result = startLesson(current, phraseIndex)) {
+                is StartLessonResult.Ready -> {
+                    _message.value = null
+                    onReady(phraseIndex)
+                }
+                is StartLessonResult.Locked -> _message.value = result.message
+                is StartLessonResult.NoSuchPhrase -> _message.value = "This phrase isn't available."
             }
         }
     }
@@ -131,20 +168,34 @@ fun SongDetailScreen(
     songId: String,
     onPractisePhrase: (phraseIndex: Int) -> Unit,
     onSongComplete: () -> Unit,
-    viewModel: SongDetailViewModel = viewModel { SongDetailViewModel(songId) },
+    container: AppContainer,
+    viewModel: SongDetailViewModel = viewModel {
+        SongDetailViewModel(songId, container.songCatalog, container.progress, container.startLesson)
+    },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val message by viewModel.message.collectAsStateWithLifecycle()
     when (val current = state) {
         SongDetailUiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         is SongDetailUiState.Error -> Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
             Text(current.message, textAlign = TextAlign.Center)
         }
-        is SongDetailUiState.Loaded -> SongDetailContent(current.detail, onPractisePhrase, onSongComplete)
+        is SongDetailUiState.Loaded -> SongDetailContent(
+            detail = current.detail,
+            onPractisePhrase = { index -> viewModel.openPhrase(index, onPractisePhrase) },
+            onSongComplete = onSongComplete,
+            message = message,
+        )
     }
 }
 
 @Composable
-fun SongDetailContent(detail: SongDetailState, onPractisePhrase: (phraseIndex: Int) -> Unit, onSongComplete: () -> Unit) {
+fun SongDetailContent(
+    detail: SongDetailState,
+    onPractisePhrase: (phraseIndex: Int) -> Unit,
+    onSongComplete: () -> Unit,
+    message: String? = null,
+) {
     // Locked phrases never reach the lesson, however this is called.
     val openIfUnlocked: (Int) -> Unit = { index -> if (detail.canOpen(index)) onPractisePhrase(index) }
     LazyColumn(
@@ -162,6 +213,9 @@ fun SongDetailContent(detail: SongDetailState, onPractisePhrase: (phraseIndex: I
             Button(onClick = { openIfUnlocked(detail.currentPhraseIndex) }, modifier = Modifier.fillMaxWidth()) {
                 Text(detail.continueText)
             }
+        }
+        if (message != null) {
+            item { Text(message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
         }
         if (detail.completed) {
             item {

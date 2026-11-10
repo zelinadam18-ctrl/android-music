@@ -32,7 +32,9 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.rudicilibrasi.pianotrainer.core.music.Song
 import io.github.rudicilibrasi.pianotrainer.core.progress.SongProgress
+import io.github.rudicilibrasi.pianotrainer.AppContainer
 import io.github.rudicilibrasi.pianotrainer.data.SongCatalog
+import io.github.rudicilibrasi.pianotrainer.database.ProgressReader
 import io.github.rudicilibrasi.pianotrainer.ui.theme.PianoTrainerTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -65,7 +67,7 @@ data class SongCardState(
     val bestScoreText: String? get() = bestOverallScore?.let { "Best score $it" }
 
     companion object {
-        /** The card for [song] with [progress]; without progress (until #54), the song is not started. */
+        /** The card for [song] with [progress]; a song with no saved progress is not started. */
         fun of(song: Song, progress: SongProgress = SongProgress.initial(song)) = SongCardState(
             songId = song.id,
             title = song.title,
@@ -89,17 +91,21 @@ sealed interface SongsUiState {
     data class Error(val message: String) : SongsUiState
 }
 
-class SongsViewModel(private val catalog: SongCatalog = SongCatalog.bundled()) : ViewModel() {
+class SongsViewModel(private val catalog: SongCatalog, private val progress: ProgressReader) : ViewModel() {
     private val _uiState = MutableStateFlow<SongsUiState>(SongsUiState.Loading)
     val uiState: StateFlow<SongsUiState> = _uiState.asStateFlow()
 
     init {
         viewModelScope.launch {
-            _uiState.value = try {
-                // Every song shows as not started until saved progress is wired up (#54).
-                SongsUiState.Loaded(catalog.loadSongs().map { SongCardState.of(it) })
+            val songs = try {
+                catalog.loadSongs()
             } catch (e: Exception) {
-                SongsUiState.Error("The songs couldn't be loaded. Please reinstall the app if this keeps happening.\n(${e.message})")
+                _uiState.value = SongsUiState.Error("The songs couldn't be loaded. Please reinstall the app if this keeps happening.\n(${e.message})")
+                return@launch
+            }
+            // Saved progress updates the cards as soon as an attempt is recorded.
+            progress.observeAll(songs).collect { bySong ->
+                _uiState.value = SongsUiState.Loaded(songs.map { SongCardState.of(it, bySong.getValue(it.id)) })
             }
         }
     }
@@ -108,8 +114,9 @@ class SongsViewModel(private val catalog: SongCatalog = SongCatalog.bundled()) :
 /** The home screen: every bundled song, in menu order, with its progress. */
 @Composable
 fun SongsScreen(
+    container: AppContainer,
     onOpenSong: (songId: String) -> Unit,
-    viewModel: SongsViewModel = viewModel { SongsViewModel() },
+    viewModel: SongsViewModel = viewModel { SongsViewModel(container.songCatalog, container.progress) },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     SongsContent(state, onOpenSong)
