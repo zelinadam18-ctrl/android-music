@@ -49,6 +49,15 @@ class StaffLayoutTest {
     }
 
     @Test
+    fun aBeamPushingAStemUpwardStillFitsInTheDrawing() {
+        // B5 is beamed with A3, so its stem goes up, far above the usual estimate.
+        val layout = layout("A3/0.5 B5/0.5")
+        assertTrue(layout.events.all { it.stem!!.up })
+        assertTrue(layout.beams.all { minOf(it.startY, it.endY) - StaffLayout.BEAM_THICKNESS / 2 >= 0.0 }, "beams ${layout.beams}")
+        assertTrue(layout.events.all { it.stem!!.tipY >= 0.0 })
+    }
+
+    @Test
     fun theDrawingIsTallEnoughForHeadsStemsAndLabels() {
         val layout = layout("G3/1 C6/1 A3/0.5 B5/0.25")
         for (event in layout.events) {
@@ -94,9 +103,12 @@ class StaffLayoutTest {
 
     @Test
     fun eighthsAndSixteenthsGetFlags() {
-        val layout = layout("C4/1 C4/0.5 C4/0.25 C5/0.5")
-        assertEquals(listOf(0, 1, 2, 1), layout.events.map { it.stem!!.flags })
-        assertTrue(!layout.events[3].stem!!.up)
+        // Each short note alone in its beat, so it keeps its flags.
+        val layout = layout("C4/1 C4/0.5 R/0.5 C4/0.25 R/0.75 C5/0.5 R/0.5")
+        val notes = layout.events.filter { !it.isRest }
+        assertEquals(listOf(0, 1, 2, 1), notes.map { it.stem!!.flags })
+        assertTrue(!notes[3].stem!!.up)
+        assertEquals(emptyList(), layout.beams)
     }
 
     @Test
@@ -164,5 +176,89 @@ class StaffLayoutTest {
         val sharp = layout("C4/1 F#4/1 A4/1")
         assertTrue(sharp.events[1].sharp)
         assertEquals(StaffLayout.SHARP_SPACE, (sharp.events[1].x - sharp.events[0].x) - (plain.events[1].x - plain.events[0].x), 1e-9)
+    }
+}
+
+class BeamTest {
+
+    private fun layout(events: String, time: TimeSignature? = TimeSignature(4, 4)) = StaffLayout(SongFormat.parseEvents(events), time)
+
+    @Test
+    fun sixteenthsInABeatShareTwoBeams() {
+        // Prelude in C: four sixteenths per beat, two beats.
+        val layout = layout("C4/0.25 E4/0.25 G4/0.25 C5/0.25 E5/0.25 G4/0.25 C5/0.25 E5/0.25")
+        assertTrue(layout.events.all { it.stem!!.flags == 0 }, "beamed notes have no flags")
+        assertEquals(2, layout.beams.count { it.level == 0 })
+        assertEquals(2, layout.beams.count { it.level == 1 })
+        // Each primary beam runs from the first to the last stem of its beat.
+        val first = layout.beams.first { it.level == 0 }
+        assertEquals(layout.events[0].stem!!.x, first.startX, 1e-9)
+        assertEquals(layout.events[3].stem!!.x, first.endX, 1e-9)
+    }
+
+    @Test
+    fun aGroupHasOneStemDirectionFromItsAveragePosition() {
+        // C4 is low but A5 pulls the average up to the middle line: both stems down.
+        val down = layout("C4/0.5 A5/0.5").events
+        assertTrue(down.all { !it.stem!!.up }, "${down.map { it.stem }}")
+        val up = layout("C4/0.5 E4/0.5").events
+        assertTrue(up.all { it.stem!!.up })
+    }
+
+    @Test
+    fun stemsMeetTheBeamAndAreLongEnough() {
+        val layout = layout("C4/0.5 G4/0.5 E4/0.5 C5/0.5")
+        for ((group, beam) in listOf(layout.events.take(2), layout.events.drop(2)).zip(layout.beams)) {
+            for (event in group) {
+                val stem = event.stem!!
+                // On the beam line, at its outer edge.
+                val t = (stem.x - beam.startX) / (beam.endX - beam.startX)
+                val beamCentre = beam.startY + t * (beam.endY - beam.startY)
+                val edge = if (stem.up) beamCentre - StaffLayout.BEAM_THICKNESS / 2 else beamCentre + StaffLayout.BEAM_THICKNESS / 2
+                assertEquals(edge, stem.tipY, 1e-9)
+                assertTrue(kotlin.math.abs(event.y - stem.tipY) >= StaffLayout.BEAMED_STEM - 1e-9, "stem ${event.y - stem.tipY}")
+            }
+        }
+    }
+
+    @Test
+    fun beamSlopeIsGentle() {
+        // A leap of more than an octave still gives at most one space of rise.
+        val beam = layout("C4/0.5 E5/0.5").beams.single()
+        assertTrue(kotlin.math.abs(beam.endY - beam.startY) <= StaffLayout.MAX_BEAM_RISE + 1e-9)
+        val flat = layout("G4/0.5 G4/0.5").beams.single()
+        assertEquals(flat.startY, flat.endY, 1e-9)
+    }
+
+    @Test
+    fun dottedEighthAndSixteenthGetABeamletOnTheSixteenth() {
+        // Happy Birthday: "Hap-py" is a dotted eighth and a sixteenth in one beat.
+        val layout = layout("G4/0.75 G4/0.25 A4/1 G4/1")
+        val (dotted, sixteenth) = layout.events
+        assertEquals(1, dotted.dots)
+        assertEquals(0, dotted.stem!!.flags)
+        assertEquals(0, sixteenth.stem!!.flags)
+        assertEquals(1, layout.beams.count { it.level == 0 })
+        val beamlet = layout.beams.single { it.level == 1 }
+        // Short, ending at the sixteenth's stem and pointing back at the dotted eighth.
+        assertEquals(sixteenth.stem!!.x, beamlet.endX, 1e-9)
+        assertEquals(StaffLayout.BEAMLET_LENGTH, beamlet.endX - beamlet.startX, 1e-9)
+    }
+
+    @Test
+    fun differentBeatsRestsAndLoneNotesAreNotBeamed() {
+        // Eighths split across beats 1-2 (off-beat start), a rest in the middle, a lone eighth.
+        val layout = layout("C4/1 C4/0.5 R/0.5 D4/0.5 E4/0.5 F4/1")
+        assertEquals(1, layout.beams.size, "only D4-E4 share a beat with nothing between")
+        assertEquals(1, layout.events[1].stem!!.flags, "lone eighth keeps its flag")
+        assertEquals(0, layout.events[3].stem!!.flags)
+    }
+
+    @Test
+    fun compoundTimeBeamsByDottedQuarter() {
+        // 6/8: three eighths per beat.
+        val layout = layout("C4/0.5 D4/0.5 E4/0.5 F4/0.5 G4/0.5 A4/0.5", TimeSignature(6, 8))
+        assertEquals(2, layout.beams.size)
+        assertTrue(layout.events.all { it.stem!!.flags == 0 })
     }
 }

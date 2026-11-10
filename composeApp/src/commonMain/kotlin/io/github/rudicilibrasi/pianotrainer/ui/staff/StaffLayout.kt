@@ -6,6 +6,7 @@ import io.github.rudicilibrasi.pianotrainer.core.notation.Accidental
 import io.github.rudicilibrasi.pianotrainer.core.notation.StemDirection
 import io.github.rudicilibrasi.pianotrainer.core.notation.TrebleStaff
 import kotlin.math.abs
+import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.pow
 
@@ -39,8 +40,14 @@ enum class NoteValue(val beats: Double, val flags: Int) {
 /** Which note-head glyph to draw. */
 enum class NoteHead { Black, Half, Whole }
 
-/** A note's stem, from the head to the tip, with any flags at the tip. */
+/** A note's stem, from the head to the tip, with any flags at the tip (none when beamed). */
 data class Stem(val x: Double, val headY: Double, val tipY: Double, val up: Boolean, val flags: Int)
+
+/**
+ * One beam, as a thick line from ([startX], [startY]) to ([endX], [endY]) along its centre.
+ * Level 0 is the primary beam joining every note of a group; level 1 joins sixteenths.
+ */
+data class Beam(val startX: Double, val startY: Double, val endX: Double, val endY: Double, val level: Int)
 
 /**
  * One event placed on the staff. All lengths are in staff spaces (the gap between two staff
@@ -79,7 +86,10 @@ data class PlacedEvent(
  *
  * - Note heads, ledger lines and a "C4" label row under the staff.
  * - Stems follow [TrebleStaff] (#24): up below the middle line, down on or above it, 3.5 spaces
- *   long. Eighths and sixteenths get one or two flags (beams come in #27).
+ *   long. Unbeamed eighths and sixteenths get one or two flags.
+ * - Eighths and sixteenths in the same beat are beamed instead (#27): one stem direction per
+ *   group from its average position, a beam sloping with the first and last notes (at most one
+ *   space), stems lengthened to meet it, and a second beam (or a short beamlet) for sixteenths.
  * - Dotted values get a dot; rests are drawn at their usual heights.
  * - The time signature after the clef, and a bar line wherever a bar ends inside the phrase,
  *   counted from the phrase's [phraseStartBeat] and the song's [pickupBeats].
@@ -99,9 +109,12 @@ class StaffLayout(
 
     private val noteSteps = phraseEvents.mapNotNull { event -> event.pitch?.let { TrebleStaff.position(it).step } }
 
-    /** The highest and lowest steps anything reaches: note heads, stem tips and the clef. */
-    private val topStep: Int
-    private val bottomStep: Int
+    /**
+     * The highest and lowest steps anything reaches: note heads, stem tips, beams and the clef.
+     * Estimated from the notes first, then widened if beaming pushed a stem further (see below).
+     */
+    private var topStep: Int
+    private var bottomStep: Int
 
     init {
         var top = TrebleStaff.TOP_LINE + CLEF_HEADROOM_STEPS
@@ -124,41 +137,71 @@ class StaffLayout(
     val clefX: Double = 0.5
 
     /** Where the clef glyph's origin sits: on the G line (step 2), as SMuFL expects. */
-    val clefY: Double = y(TrebleStaff.BOTTOM_LINE + 2)
+    val clefY: Double get() = y(TrebleStaff.BOTTOM_LINE + 2)
 
     /** Left edge of the time signature, or null when none is shown. */
     val timeSignatureX: Double? = timeSignature?.let { CLEF_WIDTH }
 
     /** Baselines of the time signature's two digits: centred on the 2nd and 4th lines' spaces. */
-    val timeSignatureTopY: Double = y(TrebleStaff.TOP_LINE - 2)
-    val timeSignatureBottomY: Double = y(TrebleStaff.BOTTOM_LINE + 2)
+    val timeSignatureTopY: Double get() = y(TrebleStaff.TOP_LINE - 2)
+    val timeSignatureBottomY: Double get() = y(TrebleStaff.BOTTOM_LINE + 2)
 
     /** Horizontal positions of bar lines inside the phrase. */
     val barLineXs: List<Double>
 
     /** Top of the note-label row. */
-    val labelTop: Double = y(bottomStep) + 0.5
+    val labelTop: Double get() = y(bottomStep) + 0.5
 
     val events: List<PlacedEvent>
+
+    val beams: List<Beam>
 
     /** Total width, ending a little after the last note. */
     val width: Double
 
     /** Total height, including the label row. */
-    val height: Double = labelTop + LABEL_ROW_SPACES
+    val height: Double get() = labelTop + LABEL_ROW_SPACES
 
     /** Top and bottom of the staff lines, for bar lines. */
     val staffTopY: Double get() = y(TrebleStaff.TOP_LINE)
     val staffBottomY: Double get() = y(TrebleStaff.BOTTOM_LINE)
 
     init {
+        var placement = place(phraseEvents, phraseStartBeat, pickupBeats)
+        // A beamed group can force a stem against its usual direction, past the estimate above:
+        // make room and lay out again (everything moves down together, so once is enough).
+        val stemYs = placement.events.mapNotNull { it.stem?.tipY } +
+            placement.beams.flatMap { listOf(it.startY, it.endY) }.flatMap { listOf(it - BEAM_THICKNESS, it + BEAM_THICKNESS) }
+        val minY = stemYs.minOrNull()
+        val maxY = stemYs.maxOrNull()
+        var grown = false
+        if (minY != null && minY < MARGIN) {
+            topStep += ceil((MARGIN - minY) * 2).toInt()
+            grown = true
+        }
+        if (maxY != null && maxY > y(bottomStep)) {
+            bottomStep -= ceil((maxY - y(bottomStep)) * 2).toInt()
+            grown = true
+        }
+        if (grown) placement = place(phraseEvents, phraseStartBeat, pickupBeats)
+        events = placement.events
+        beams = placement.beams
+        barLineXs = placement.bars
+        width = placement.width
+    }
+
+    private class Placement(val events: List<PlacedEvent>, val beams: List<Beam>, val bars: List<Double>, val width: Double)
+
+    private fun place(phraseEvents: List<NoteEvent>, phraseStartBeat: Double, pickupBeats: Double): Placement {
         var x = CLEF_WIDTH + (if (timeSignature != null) TIME_SIGNATURE_WIDTH else 0.0) + LEAD_IN
         var noteIndex = 0
         var beat = phraseStartBeat
         val bars = ArrayList<Double>()
         val barLength = timeSignature?.quarterBeatsPerBar
+        val startBeats = ArrayList<Double>()
 
-        events = phraseEvents.mapIndexed { index, event ->
+        val placedEvents = phraseEvents.mapIndexed { index, event ->
+            startBeats += beat
             val (value, dots) = NoteValue.of(event.beats)
             val pitch = event.pitch
             val placed = if (pitch == null) {
@@ -226,8 +269,86 @@ class StaffLayout(
             }
             placed
         }
-        barLineXs = bars
-        width = x - spacing(phraseEvents.lastOrNull()?.beats ?: 1.0) + LAST_NOTE_ROOM + END_MARGIN
+        val beamUnit = if (timeSignature?.beatUnit == 8) 1.5 else 1.0
+        val (beamedEvents, beamList) = beam(placedEvents, startBeats.map { it - pickupBeats }, beamUnit)
+        return Placement(beamedEvents, beamList, bars, x - spacing(phraseEvents.lastOrNull()?.beats ?: 1.0) + LAST_NOTE_ROOM + END_MARGIN)
+    }
+
+    /**
+     * Beams eighths and sixteenths that share a beat of [unit] beats. [beats] is each event's start,
+     * counted from the first full bar.
+     */
+    private fun beam(placed: List<PlacedEvent>, beats: List<Double>, unit: Double): Pair<List<PlacedEvent>, List<Beam>> {
+        val result = placed.toMutableList()
+        val beams = ArrayList<Beam>()
+        val groups = ArrayList<List<Int>>()
+        var current = ArrayList<Int>()
+        var currentBeat = Long.MIN_VALUE
+        for (i in placed.indices) {
+            val event = placed[i]
+            val beamable = !event.isRest && event.value.flags > 0
+            val beatIndex = floor(beats[i] / unit + EPSILON).toLong()
+            if (!beamable || beatIndex != currentBeat) {
+                if (current.size >= 2) groups += current
+                current = ArrayList()
+                currentBeat = beatIndex
+            }
+            if (beamable) current += i
+        }
+        if (current.size >= 2) groups += current
+
+        for (group in groups) {
+            val notes = group.map { placed[it] }
+            val up = notes.sumOf { it.step!! }.toDouble() / notes.size < TrebleStaff.MIDDLE_LINE
+            val sign = if (up) -1.0 else 1.0 // Direction from head to tip, in y.
+            fun stemX(e: PlacedEvent) = if (up) e.x + HEAD_HALF_WIDTH - STEM_INSET else e.x - HEAD_HALF_WIDTH + STEM_INSET
+            val firstX = stemX(notes.first())
+            val lastX = stemX(notes.last())
+            // Follow the first and last notes, but gently: at most one space of rise.
+            val rise = (notes.last().y - notes.first().y).coerceIn(-MAX_BEAM_RISE, MAX_BEAM_RISE)
+            val slope = if (lastX > firstX) rise / (lastX - firstX) else 0.0
+            fun lineAt(x: Double, offset: Double) = notes.first().y + slope * (x - firstX) + offset
+            // Shift the beam so even the shortest stem is the normal length.
+            val offset = sign * notes.maxOf { e -> BEAMED_STEM - sign * (lineAt(stemX(e), 0.0) - e.y) }
+            for ((k, index) in group.withIndex()) {
+                val e = notes[k]
+                val x = stemX(e)
+                result[index] = e.copy(
+                    stem = Stem(
+                        x = x,
+                        headY = e.y - sign * STEM_HEAD_OVERLAP,
+                        tipY = lineAt(x, offset),
+                        up = up,
+                        flags = 0,
+                    ),
+                    dotX = e.dotX?.let { e.x + HEAD_HALF_WIDTH + DOT_GAP },
+                )
+            }
+            // Primary beam across the group, its outer edge at the stem tips.
+            val inward = -sign * BEAM_THICKNESS / 2
+            beams += Beam(firstX, lineAt(firstX, offset) + inward, lastX, lineAt(lastX, offset) + inward, level = 0)
+            // Secondary beams: whole runs of sixteenths, or a beamlet towards the neighbour.
+            val secondInward = inward - sign * BEAM_SPACING
+            var k = 0
+            while (k < notes.size) {
+                if (notes[k].value != NoteValue.Sixteenth) {
+                    k++
+                    continue
+                }
+                var end = k
+                while (end + 1 < notes.size && notes[end + 1].value == NoteValue.Sixteenth) end++
+                val (from, to) = if (end > k) {
+                    stemX(notes[k]) to stemX(notes[end])
+                } else {
+                    // A lone sixteenth: a short beamlet pointing at the note it belongs with.
+                    val x = stemX(notes[k])
+                    if (k > 0) (x - BEAMLET_LENGTH) to x else x to (x + BEAMLET_LENGTH)
+                }
+                beams += Beam(from, lineAt(from, offset) + secondInward, to, lineAt(to, offset) + secondInward, level = 1)
+                k = end + 1
+            }
+        }
+        return result to beams
     }
 
     companion object {
@@ -257,6 +378,18 @@ class StaffLayout(
         const val REST_DOT_OFFSET = 1.4
 
         const val LABEL_ROW_SPACES = 2.0
+
+        /** Room kept above the highest stem or beam. */
+        private const val MARGIN = 0.5
+
+        /** Beam thickness and the distance between beam centres, in staff spaces. */
+        const val BEAM_THICKNESS = 0.5
+        const val BEAM_SPACING = 0.75
+        const val MAX_BEAM_RISE = 1.0
+        const val BEAMLET_LENGTH = 1.1
+
+        /** Shortest stem in a beamed group: the normal 3.5 spaces, so the beam clears the heads. */
+        const val BEAMED_STEM = 3.5
 
         /** The treble clef reaches about 3.5 spaces above the top line and 2.5 below the bottom. */
         private const val CLEF_HEADROOM_STEPS = 7

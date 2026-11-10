@@ -62,7 +62,8 @@ private object Glyph {
 /**
  * A phrase drawn on a treble staff (#25, #26): clef, time signature, staff lines, note heads,
  * stems, flags, dots, rests, ledger lines, bar lines, and a "C4"-style label under each note,
- * matching the letter list on the lesson screen. Beams come in #27.
+ * matching the letter list on the lesson screen. Eighths and sixteenths in the same beat are
+ * beamed (#27).
  *
  * Glyphs come from the Bravura music font (SMuFL, SIL Open Font License; see
  * `files/licenses/bravura-ofl.txt`). A 6–8 note phrase fits a phone in portrait at the default
@@ -124,6 +125,15 @@ fun StaffView(
 
         for (barX in layout.barLineXs) {
             drawLine(ink, Offset(px(barX), px(layout.staffTopY)), Offset(px(barX), px(layout.staffBottomY)), strokeWidth = px(BAR_LINE_THICKNESS))
+        }
+
+        for (beam in layout.beams) {
+            drawLine(
+                ink,
+                Offset(px(beam.startX), px(beam.startY)),
+                Offset(px(beam.endX), px(beam.endY)),
+                strokeWidth = px(StaffLayout.BEAM_THICKNESS),
+            )
         }
 
         for (event in layout.events) {
@@ -206,6 +216,16 @@ private fun TwinklePhrase1Preview() = PianoTrainerTheme {
 @Composable
 private fun G3ToG5Preview() = PianoTrainerTheme {
     StaffView(SongFormat.parseEvents("G3/1 A3/1 B3/1 C4/1 D4/1 E4/1 F#4/1 G4/1 B4/1 D5/1 F5/1 G5/4"))
+}
+
+@Preview
+@Composable
+private fun BeamsPreview() = PianoTrainerTheme {
+    // Prelude-style sixteenths, and Happy Birthday's dotted eighth + sixteenth.
+    StaffView(
+        SongFormat.parseEvents("C4/0.25 E4/0.25 G4/0.25 C5/0.25 E5/0.25 G4/0.25 C5/0.25 E5/0.25 G4/0.75 G4/0.25 A4/1 G4/1"),
+        timeSignature = TimeSignature(4, 4),
+    )
 }
 
 @Preview
