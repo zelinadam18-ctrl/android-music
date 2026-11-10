@@ -32,6 +32,7 @@ import io.github.rudicilibrasi.pianotrainer.ui.staff.StaffView
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlin.math.roundToInt
@@ -57,6 +58,8 @@ data class HistoryDetailState(
     val toImprove: List<String>,
     /** Shown when the attempt was analysed by an older (or newer) version than this app's. */
     val versionNote: String?,
+    /** How this attempt compares with the others on the same phrase; null for Free Practice. */
+    val trend: PhraseTrend? = null,
 ) {
     companion object {
         fun of(attempt: Attempt, songs: Map<String, Song>, timeZone: TimeZone): HistoryDetailState {
@@ -132,7 +135,14 @@ class HistoryDetailViewModel(
                 } else {
                     // A song that no longer loads shouldn't hide the saved results.
                     val songs = runCatching { catalog.loadSongs().associateBy { it.id } }.getOrDefault(emptyMap())
-                    HistoryDetailUiState.Loaded(HistoryDetailState.of(attempt, songs, timeZone))
+                    val songId = attempt.songId
+                    val phraseIndex = attempt.phraseIndex
+                    val trend = if (songId != null && phraseIndex != null) {
+                        PhraseTrend.of(history.observeForPhrase(songId, phraseIndex).first(), attempt)
+                    } else {
+                        null
+                    }
+                    HistoryDetailUiState.Loaded(HistoryDetailState.of(attempt, songs, timeZone).copy(trend = trend))
                 }
             } catch (e: Exception) {
                 HistoryDetailUiState.Error("This attempt couldn't be loaded.\n(${e.message})")
@@ -168,6 +178,7 @@ fun HistoryDetailContent(detail: HistoryDetailState) {
         Text("${detail.score}/100", style = MaterialTheme.typography.displaySmall)
         detail.components.forEach { (name, value) -> Text("$name: $value", style = MaterialTheme.typography.bodyLarge) }
         detail.versionNote?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.tertiary) }
+        detail.trend?.let { PhraseTrendView(it) }
 
         Text("Expected", style = MaterialTheme.typography.titleMedium)
         Text(detail.expectedLetters, style = MaterialTheme.typography.bodyLarge)
