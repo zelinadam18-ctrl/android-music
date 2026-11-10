@@ -125,7 +125,15 @@ fun AppNavigation(
                 )
             }
             composable<PhraseResultsRoute> { entry ->
-                PhraseResultsScreen(attemptId = entry.toRoute<PhraseResultsRoute>().attemptId)
+                PhraseResultsScreen(
+                    attemptId = entry.toRoute<PhraseResultsRoute>().attemptId,
+                    container = container,
+                    // Results replace themselves with the next screen, so Back returns to the song.
+                    onRetry = { songId, phraseIndex -> navController.navigateReplacing(LessonRoute(songId, phraseIndex)) },
+                    onRetryFreePractice = { navController.navigateReplacing(FreePracticeRoute) },
+                    onNextPhrase = { songId, phraseIndex -> navController.navigateReplacing(LessonRoute(songId, phraseIndex)) },
+                    onSongComplete = { songId -> navController.navigateReplacing(SongCompleteRoute(songId)) },
+                )
             }
             composable<SongCompleteRoute> { entry ->
                 SongCompleteScreen(songId = entry.toRoute<SongCompleteRoute>().songId, container = container)
@@ -140,6 +148,14 @@ fun AppNavigation(
                 FreePracticeScreen()
             }
         }
+    }
+}
+
+/** Opens [route] in place of the current screen. */
+private fun NavHostController.navigateReplacing(route: Any) {
+    val current = currentBackStackEntry?.destination?.id
+    navigate(route) {
+        if (current != null) popUpTo(current) { inclusive = true }
     }
 }
 
