@@ -8,6 +8,9 @@ import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
+/** The detected notes plus the onsets and pitch track they came from. */
+data class NoteAnalysis(val notes: List<DetectedNote>, val onsets: List<Onset>, val pitchFrames: List<PitchFrame>)
+
 /**
  * Turns a recording into the list of notes the student played (spec §10), combining
  * [OnsetDetector] (where notes start) with [PitchDetector] (what pitch is sounding).
@@ -39,24 +42,31 @@ class NoteDetector(
     private val pitchDetector = PitchDetector(sampleRate)
     private val blockSize = (sampleRate * 0.01).roundToInt().coerceAtLeast(1)
 
-    fun detect(recording: FloatArray): List<DetectedNote> {
-        val peak = recording.maxOfOrNull { abs(it) } ?: return emptyList()
-        if (peak < silencePeak) return emptyList()
+    fun detect(recording: FloatArray): List<DetectedNote> = analyze(recording).notes
+
+    /**
+     * Like [detect], but also returns the onsets and pitch track it used, so callers that also
+     * draw graphs don't have to compute them again.
+     */
+    fun analyze(recording: FloatArray): NoteAnalysis {
+        val peak = recording.maxOfOrNull { abs(it) } ?: return NoteAnalysis(emptyList(), emptyList(), emptyList())
+        if (peak < silencePeak) return NoteAnalysis(emptyList(), emptyList(), pitchDetector.detect(recording))
         val gain = (TARGET_PEAK / peak).toFloat()
         val samples = FloatArray(recording.size) { recording[it] * gain }
 
-        val onsets = onsetDetector.detect(samples)
-        if (onsets.isEmpty()) return emptyList()
         val frames = pitchDetector.detect(samples)
+        val onsets = onsetDetector.detect(samples)
+        if (onsets.isEmpty()) return NoteAnalysis(emptyList(), onsets, frames)
         val blockRms = blockRms(samples)
         val noiseThreshold = noiseFloor(blockRms) * dbToRatio(noiseMarginDb)
         val endSeconds = samples.size.toDouble() / sampleRate
 
-        return onsets.indices.mapNotNull { i ->
+        val notes = onsets.indices.mapNotNull { i ->
             val start = onsets[i].timeSeconds
             val end = onsets.getOrNull(i + 1)?.timeSeconds ?: endSeconds
             segmentNote(start, end, frames, blockRms, noiseThreshold)
         }
+        return NoteAnalysis(notes, onsets, frames)
     }
 
     private fun segmentNote(
