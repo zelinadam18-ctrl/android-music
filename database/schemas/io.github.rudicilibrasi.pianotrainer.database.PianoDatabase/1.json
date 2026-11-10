@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "182c2be0e4be539131632ad719eb370c",
+    "identityHash": "3bec356600784dea071ac66b08fc8673",
     "entities": [
       {
         "tableName": "metadata",
@@ -27,11 +27,138 @@
             "key"
           ]
         }
+      },
+      {
+        "tableName": "song_progress",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`songId` TEXT NOT NULL, `startedAt` INTEGER, `currentPhraseIndex` INTEGER NOT NULL, `highestUnlockedIndex` INTEGER NOT NULL, `completedPhraseCount` INTEGER NOT NULL, `attemptCount` INTEGER NOT NULL, `overallScore` INTEGER, `completed` INTEGER NOT NULL, `starEarned` INTEGER NOT NULL, `starEarnedAt` INTEGER, `lastAttemptAt` INTEGER, PRIMARY KEY(`songId`))",
+        "fields": [
+          {
+            "fieldPath": "songId",
+            "columnName": "songId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startedAt",
+            "columnName": "startedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "currentPhraseIndex",
+            "columnName": "currentPhraseIndex",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "highestUnlockedIndex",
+            "columnName": "highestUnlockedIndex",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "completedPhraseCount",
+            "columnName": "completedPhraseCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "attemptCount",
+            "columnName": "attemptCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "overallScore",
+            "columnName": "overallScore",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "completed",
+            "columnName": "completed",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "starEarned",
+            "columnName": "starEarned",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "starEarnedAt",
+            "columnName": "starEarnedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "lastAttemptAt",
+            "columnName": "lastAttemptAt",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "songId"
+          ]
+        }
+      },
+      {
+        "tableName": "phrase_progress",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`songId` TEXT NOT NULL, `phraseIndex` INTEGER NOT NULL, `noteCount` INTEGER NOT NULL, `bestScore` INTEGER, `latestScore` INTEGER, `attemptCount` INTEGER NOT NULL, `unlocked` INTEGER NOT NULL, PRIMARY KEY(`songId`, `phraseIndex`))",
+        "fields": [
+          {
+            "fieldPath": "songId",
+            "columnName": "songId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "phraseIndex",
+            "columnName": "phraseIndex",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "noteCount",
+            "columnName": "noteCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bestScore",
+            "columnName": "bestScore",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "latestScore",
+            "columnName": "latestScore",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "attemptCount",
+            "columnName": "attemptCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "unlocked",
+            "columnName": "unlocked",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "songId",
+            "phraseIndex"
+          ]
+        }
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '182c2be0e4be539131632ad719eb370c')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '3bec356600784dea071ac66b08fc8673')"
     ]
   }
 }

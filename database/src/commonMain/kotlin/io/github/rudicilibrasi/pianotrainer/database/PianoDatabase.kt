@@ -15,10 +15,16 @@ import kotlinx.coroutines.IO
  * Build one with [buildPianoDatabase] from a platform builder: `databaseBuilder(context)` on
  * Android, `databaseBuilder()` on iOS.
  */
-@Database(entities = [MetadataEntity::class], version = 1, exportSchema = true)
+@Database(
+    entities = [MetadataEntity::class, SongProgressEntity::class, PhraseProgressEntity::class],
+    version = 1,
+    exportSchema = true,
+)
 @ConstructedBy(PianoDatabaseConstructor::class)
 abstract class PianoDatabase : RoomDatabase() {
     abstract fun metadataDao(): MetadataDao
+
+    abstract fun progressDao(): ProgressDao
 
     companion object {
         const val FILE_NAME = "piano_trainer.db"
