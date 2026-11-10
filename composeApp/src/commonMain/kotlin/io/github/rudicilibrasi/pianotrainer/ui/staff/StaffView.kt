@@ -1,6 +1,7 @@
 package io.github.rudicilibrasi.pianotrainer.ui.staff
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -31,7 +32,7 @@ import pianotrainer.composeapp.generated.resources.Res
 import pianotrainer.composeapp.generated.resources.bravura
 
 /** SMuFL code points in the Bravura font. */
-private object Glyph {
+internal object Glyph {
     const val G_CLEF = "\uE050"
     const val NOTEHEAD_WHOLE = "\uE0A2"
     const val NOTEHEAD_HALF = "\uE0A3"
@@ -74,6 +75,8 @@ private object Glyph {
  * @param timeSignature shown after the clef, and used to place bar lines; null shows neither.
  * @param phraseStartBeat the phrase's start beat from the start of the song (Phrase.startBeat).
  * @param pickupBeats the song's pickup length, so bar lines fall in the right places.
+ * @param scrollState shared with another staff so the two scroll together (see [ComparedStaves]).
+ * @param minWidthSpaces draw at least this wide, in staff spaces, e.g. to match a second staff.
  */
 @Composable
 fun StaffView(
@@ -84,6 +87,8 @@ fun StaffView(
     phraseStartBeat: Double = 0.0,
     pickupBeats: Double = 0.0,
     staffSpace: Dp = 9.dp,
+    scrollState: ScrollState = rememberScrollState(),
+    minWidthSpaces: Double = 0.0,
 ) {
     val layout = remember(events, timeSignature, phraseStartBeat, pickupBeats) {
         StaffLayout(events, timeSignature, phraseStartBeat, pickupBeats)
@@ -101,8 +106,8 @@ fun StaffView(
 
     Canvas(
         modifier = modifier
-            .horizontalScroll(rememberScrollState())
-            .size(staffSpace * layout.width.toFloat(), staffSpace * layout.height.toFloat())
+            .horizontalScroll(scrollState)
+            .size(staffSpace * maxOf(layout.width, minWidthSpaces).toFloat(), staffSpace * layout.height.toFloat())
             .semantics { contentDescription = description },
     ) {
         fun px(spaces: Double) = (spaces * spacePx).toFloat()
@@ -110,7 +115,7 @@ fun StaffView(
         // Staff lines.
         for (step in layout.lineSteps) {
             val y = px(layout.y(step))
-            drawLine(ink, Offset(0f, y), Offset(px(layout.width), y), strokeWidth = px(STAFF_LINE_THICKNESS))
+            drawLine(ink, Offset(0f, y), Offset(px(maxOf(layout.width, minWidthSpaces)), y), strokeWidth = px(STAFF_LINE_THICKNESS))
         }
 
         drawGlyph(measurer, Glyph.G_CLEF, music, ink, x = px(layout.clefX), baselineY = px(layout.clefY), centred = false)
@@ -183,7 +188,7 @@ fun StaffView(
 }
 
 /** Draws one SMuFL glyph with its baseline (the glyph's origin) at [baselineY]. */
-private fun DrawScope.drawGlyph(
+internal fun DrawScope.drawGlyph(
     measurer: TextMeasurer,
     glyph: String,
     style: TextStyle,
@@ -198,13 +203,13 @@ private fun DrawScope.drawGlyph(
 }
 
 /** Bravura's engraving defaults, in staff spaces. */
-private const val STAFF_LINE_THICKNESS = 0.13
-private const val LEDGER_LINE_THICKNESS = 0.16
+internal const val STAFF_LINE_THICKNESS = 0.13
+internal const val LEDGER_LINE_THICKNESS = 0.16
 private const val STEM_THICKNESS = 0.12
 private const val BAR_LINE_THICKNESS = 0.16
 
 /** How far left of the note head's centre the sharp is centred. */
-private const val SHARP_OFFSET = 1.3
+internal const val SHARP_OFFSET = 1.3
 
 @Preview
 @Composable
