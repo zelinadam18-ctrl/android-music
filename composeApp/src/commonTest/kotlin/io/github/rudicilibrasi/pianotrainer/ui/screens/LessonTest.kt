@@ -55,6 +55,23 @@ class LessonTest {
     }
 
     @Test
+    fun listenPlaysTheRenderedReferenceAndStopsWhenLeaving() = runTest {
+        val player = RecordingPlayer()
+        val viewModel = LessonViewModel("twinkle", 0, catalog, StartLesson(FakeProgress()), player, dispatcher)
+        testScheduler.advanceUntilIdle()
+        val ready = assertIs<LessonUiState.Ready>(viewModel.uiState.value)
+        val wav = assertNotNull(ready.referenceWav)
+        // The WAV played is the reference the graphs were drawn from: 7 notes at 120 BPM plus release.
+        val clip = io.github.rudicilibrasi.pianotrainer.core.audio.Wav.decode(wav)
+        assertEquals(4.0, clip.samples.size.toDouble() / clip.sampleRate, 0.2)
+
+        viewModel.toggleListen()
+        assertEquals(listOf("play ${wav.size}"), player.calls)
+        viewModel.toggleListen()
+        assertEquals(listOf("play ${wav.size}", "stop"), player.calls)
+    }
+
+    @Test
     fun aLockedPhraseCannotBeOpenedByAnyRoute() = runTest {
         val viewModel = lesson(1)
         testScheduler.advanceUntilIdle()
@@ -79,8 +96,26 @@ class LessonTest {
         val viewModel = lesson(7)
         testScheduler.advanceUntilIdle()
         assertIs<LessonUiState.Unavailable>(viewModel.uiState.value)
-        val missing = LessonViewModel("nope", 0, catalog, StartLesson(FakeProgress()), dispatcher)
+        val missing = LessonViewModel("nope", 0, catalog, StartLesson(FakeProgress()), analysisDispatcher = dispatcher)
         testScheduler.advanceUntilIdle()
         assertIs<LessonUiState.Unavailable>(missing.uiState.value)
+    }
+}
+
+/** Records what was asked of it, and pretends to play until stopped. */
+class RecordingPlayer : io.github.rudicilibrasi.pianotrainer.audio.AudioPlayer {
+    val calls = ArrayList<String>()
+    override val state = kotlinx.coroutines.flow.MutableStateFlow(io.github.rudicilibrasi.pianotrainer.audio.PlayerState.Idle)
+    override val positionMs = kotlinx.coroutines.flow.MutableStateFlow<Long?>(null)
+    override fun play(wav: ByteArray) {
+        calls += "play ${wav.size}"
+        state.value = io.github.rudicilibrasi.pianotrainer.audio.PlayerState.Playing
+    }
+    override fun playFile(path: String) {
+        calls += "playFile $path"
+    }
+    override fun stop() {
+        calls += "stop"
+        state.value = io.github.rudicilibrasi.pianotrainer.audio.PlayerState.Idle
     }
 }

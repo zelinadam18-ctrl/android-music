@@ -12,6 +12,7 @@ kotlin {
 }
 dependencies {
     implementation(project(":composeApp"))
+    implementation(project(":core"))
 
     implementation(libs.androidx.activity.compose)
 

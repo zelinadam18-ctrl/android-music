@@ -25,8 +25,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.rudicilibrasi.pianotrainer.AppContainer
 import io.github.rudicilibrasi.pianotrainer.core.analysis.AnalysisResult
 import io.github.rudicilibrasi.pianotrainer.core.analysis.AudioAnalyzer
-import io.github.rudicilibrasi.pianotrainer.core.audio.AudioClip
 import io.github.rudicilibrasi.pianotrainer.core.audio.Synthesizer
+import io.github.rudicilibrasi.pianotrainer.core.audio.Wav
+import io.github.rudicilibrasi.pianotrainer.audio.AudioPlayer
+import io.github.rudicilibrasi.pianotrainer.audio.PlayerState
+import io.github.rudicilibrasi.pianotrainer.audio.SilentAudioPlayer
 import io.github.rudicilibrasi.pianotrainer.core.music.Phrase
 import io.github.rudicilibrasi.pianotrainer.core.music.Song
 import io.github.rudicilibrasi.pianotrainer.data.SongCatalog
@@ -61,8 +64,11 @@ data class LessonState(
 sealed interface LessonUiState {
     data object Loading : LessonUiState
 
-    /** [reference] is the analysis of the synthesized reference, for the graphs; null while it's being made. */
-    data class Ready(val lesson: LessonState, val reference: AnalysisResult? = null) : LessonUiState
+    /**
+     * [reference] is the analysis of the synthesized reference, for the graphs, and
+     * [referenceWav] the same audio to play; both null while they're being made.
+     */
+    data class Ready(val lesson: LessonState, val reference: AnalysisResult? = null, val referenceWav: ByteArray? = null) : LessonUiState
 
     /** The phrase is locked, or doesn't exist; [message] says why. */
     data class Unavailable(val message: String) : LessonUiState
@@ -78,8 +84,12 @@ class LessonViewModel(
     private val phraseIndex: Int,
     private val catalog: SongCatalog,
     private val startLesson: StartLesson,
+    private val player: AudioPlayer = SilentAudioPlayer(),
     private val analysisDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : ViewModel() {
+    /** Where reference playback is, for the note highlight; null when stopped. */
+    val playbackPositionMs: StateFlow<Long?> = player.positionMs
+    val playerState: StateFlow<PlayerState> = player.state
     private val _uiState = MutableStateFlow<LessonUiState>(LessonUiState.Loading)
     val uiState: StateFlow<LessonUiState> = _uiState.asStateFlow()
 
@@ -101,15 +111,26 @@ class LessonViewModel(
                 is StartLessonResult.Ready -> {
                     val lesson = LessonState(song, result.phrase)
                     _uiState.value = LessonUiState.Ready(lesson)
-                    val reference = runCatching {
-                        val synthesizer = Synthesizer()
-                        val samples = withContext(analysisDispatcher) { synthesizer.renderPhrase(result.phrase, song.tempoBpm) }
-                        AudioAnalyzer(analysisDispatcher).analyze(AudioClip(samples, synthesizer.sampleRate))
+                    val synthesizer = Synthesizer()
+                    val wav = runCatching {
+                        withContext(analysisDispatcher) { Wav.encode(synthesizer.renderPhrase(result.phrase, song.tempoBpm), synthesizer.sampleRate) }
                     }.getOrNull()
-                    _uiState.value = LessonUiState.Ready(lesson, reference)
+                    val reference = wav?.let { runCatching { AudioAnalyzer(analysisDispatcher).analyze(it) }.getOrNull() }
+                    _uiState.value = LessonUiState.Ready(lesson, reference, wav)
                 }
             }
         }
+    }
+
+    /** Plays the reference, or stops it if it's already playing. */
+    fun toggleListen() {
+        val wav = (_uiState.value as? LessonUiState.Ready)?.referenceWav ?: return
+        if (player.state.value == PlayerState.Playing) player.stop() else player.play(wav)
+    }
+
+    /** Leaving the lesson stops the reference. */
+    override fun onCleared() {
+        player.stop()
     }
 }
 
@@ -119,20 +140,38 @@ fun LessonScreen(
     phraseIndex: Int,
     container: AppContainer,
     onAttemptAnalyzed: (attemptId: Long) -> Unit,
-    viewModel: LessonViewModel = viewModel { LessonViewModel(songId, phraseIndex, container.songCatalog, container.startLesson) },
+    viewModel: LessonViewModel = viewModel {
+        LessonViewModel(songId, phraseIndex, container.songCatalog, container.startLesson, container.audioPlayer)
+    },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val position by viewModel.playbackPositionMs.collectAsStateWithLifecycle()
+    val playerState by viewModel.playerState.collectAsStateWithLifecycle()
     when (val current = state) {
         LessonUiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         is LessonUiState.Unavailable -> Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
             Text(current.message, textAlign = TextAlign.Center)
         }
-        is LessonUiState.Ready -> LessonContent(current.lesson, current.reference)
+        is LessonUiState.Ready -> LessonContent(
+            lesson = current.lesson,
+            reference = current.reference,
+            playbackPositionMs = position,
+            canListen = current.referenceWav != null,
+            playerState = playerState,
+            onListen = viewModel::toggleListen,
+        )
     }
 }
 
 @Composable
-fun LessonContent(lesson: LessonState, reference: AnalysisResult?, playbackPositionMs: Long? = null) {
+fun LessonContent(
+    lesson: LessonState,
+    reference: AnalysisResult?,
+    playbackPositionMs: Long? = null,
+    canListen: Boolean = false,
+    playerState: PlayerState = PlayerState.Idle,
+    onListen: () -> Unit = {},
+) {
     // The note sounding during reference playback (#31); null when stopped, which clears it.
     val highlight = PlaybackHighlight(lesson.phrase, lesson.song.tempoBpm).noteAt(playbackPositionMs)
     Column(
@@ -152,13 +191,19 @@ fun LessonContent(lesson: LessonState, reference: AnalysisResult?, playbackPosit
             phraseStartBeat = lesson.phrase.startBeat,
             pickupBeats = lesson.song.pickupBeats,
         )
-        // 4. Listen to the reference: playback arrives with #21, #22 and #23.
-        Button(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth()) { Text("Listen") }
-        Text(
-            "Listening to the reference isn't available yet.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        // 4. Listen to the reference, with a loading state while it's being made.
+        Button(onClick = onListen, enabled = canListen, modifier = Modifier.fillMaxWidth()) {
+            Text(
+                when {
+                    !canListen -> "Preparing the reference…"
+                    playerState == PlayerState.Playing -> "Stop"
+                    else -> "Listen"
+                },
+            )
+        }
+        if (playerState == PlayerState.Error) {
+            Text("The reference couldn't be played. Check the volume and try again.", color = MaterialTheme.colorScheme.error)
+        }
         // 5. Recording controls (#34) go here. Reference graphs (#61):
         if (reference == null) {
             Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
