@@ -2,6 +2,7 @@ package io.github.rudicilibrasi.pianotrainer
 
 import androidx.room.RoomDatabase
 import io.github.rudicilibrasi.pianotrainer.audio.AudioPlayer
+import io.github.rudicilibrasi.pianotrainer.audio.AudioRecorder
 import io.github.rudicilibrasi.pianotrainer.data.SongCatalog
 import io.github.rudicilibrasi.pianotrainer.database.AttemptHistory
 import io.github.rudicilibrasi.pianotrainer.database.AttemptRepository
@@ -24,8 +25,13 @@ import io.github.rudicilibrasi.pianotrainer.database.buildPianoDatabase
  * @param databaseBuilder the platform's database builder: `databaseBuilder(context)` on Android,
  *   `databaseBuilder()` on iOS.
  * @param audioPlayer the platform's player: `AndroidAudioPlayer` or `IosAudioPlayer`.
+ * @param audioRecorder the platform's recorder: `AndroidAudioRecorder` or `IosAudioRecorder`.
  */
-class AppContainer(databaseBuilder: RoomDatabase.Builder<PianoDatabase>, val audioPlayer: AudioPlayer) {
+class AppContainer(
+    databaseBuilder: RoomDatabase.Builder<PianoDatabase>,
+    val audioPlayer: AudioPlayer,
+    val audioRecorder: AudioRecorder,
+) {
     val songCatalog: SongCatalog = SongCatalog.bundled()
 
     private val database: PianoDatabase by lazy { buildPianoDatabase(databaseBuilder) }
