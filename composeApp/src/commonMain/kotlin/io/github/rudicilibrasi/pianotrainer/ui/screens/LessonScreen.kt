@@ -132,7 +132,9 @@ fun LessonScreen(
 }
 
 @Composable
-fun LessonContent(lesson: LessonState, reference: AnalysisResult?) {
+fun LessonContent(lesson: LessonState, reference: AnalysisResult?, playbackPositionMs: Long? = null) {
+    // The note sounding during reference playback (#31); null when stopped, which clears it.
+    val highlight = PlaybackHighlight(lesson.phrase, lesson.song.tempoBpm).noteAt(playbackPositionMs)
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -141,10 +143,11 @@ fun LessonContent(lesson: LessonState, reference: AnalysisResult?) {
         Text(lesson.title, style = MaterialTheme.typography.headlineSmall)
         Text("${lesson.phraseText} · ${lesson.noteCountText}", style = MaterialTheme.typography.titleMedium)
         // 2. The notes in letters.
-        Text(lesson.lettersText, style = MaterialTheme.typography.titleLarge)
+        NoteLetters(lesson.phrase, highlight)
         // 3. The phrase on the staff.
         StaffView(
             lesson.phrase.events,
+            highlightNoteIndex = highlight,
             timeSignature = lesson.song.timeSignature,
             phraseStartBeat = lesson.phrase.startBeat,
             pickupBeats = lesson.song.pickupBeats,
