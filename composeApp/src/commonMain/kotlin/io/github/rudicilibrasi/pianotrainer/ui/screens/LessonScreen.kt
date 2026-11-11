@@ -28,6 +28,24 @@ import io.github.rudicilibrasi.pianotrainer.core.analysis.AudioAnalyzer
 import io.github.rudicilibrasi.pianotrainer.core.audio.Synthesizer
 import io.github.rudicilibrasi.pianotrainer.core.audio.Wav
 import io.github.rudicilibrasi.pianotrainer.audio.AudioPlayer
+import io.github.rudicilibrasi.pianotrainer.audio.AudioRecorder
+import io.github.rudicilibrasi.pianotrainer.audio.RecorderState
+import io.github.rudicilibrasi.pianotrainer.audio.SilentAudioRecorder
+import io.github.rudicilibrasi.pianotrainer.core.progress.SongProgress
+import io.github.rudicilibrasi.pianotrainer.core.scoring.FeedbackGenerator
+import io.github.rudicilibrasi.pianotrainer.core.scoring.PhraseContext
+import io.github.rudicilibrasi.pianotrainer.core.scoring.PhraseScorer
+import io.github.rudicilibrasi.pianotrainer.database.AttemptMode
+import io.github.rudicilibrasi.pianotrainer.database.AttemptScores
+import io.github.rudicilibrasi.pianotrainer.database.NewAttempt
+import io.github.rudicilibrasi.pianotrainer.database.RecordAttemptResult
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 import io.github.rudicilibrasi.pianotrainer.audio.PlayerState
 import io.github.rudicilibrasi.pianotrainer.audio.SilentAudioPlayer
 import io.github.rudicilibrasi.pianotrainer.core.music.Phrase
@@ -74,6 +92,25 @@ sealed interface LessonUiState {
     data class Unavailable(val message: String) : LessonUiState
 }
 
+/** Where the student is in recording an attempt (#34). */
+sealed interface RecordingUiState {
+    data object Idle : RecordingUiState
+    data object Recording : RecordingUiState
+    data object Analyzing : RecordingUiState
+
+    /** The microphone was refused: explain, and offer a way to Settings. */
+    data object PermissionDenied : RecordingUiState
+
+    /** Something went wrong; [message] says what to do next. */
+    data class Problem(val message: String) : RecordingUiState
+}
+
+/** "0:07", "1:05". */
+fun formatElapsed(seconds: Double): String {
+    val whole = seconds.toInt().coerceAtLeast(0)
+    return "${whole / 60}:${(whole % 60).toString().padStart(2, '0')}"
+}
+
 /**
  * Opens a lesson through [StartLesson], so a locked phrase can't be reached by any route (deep
  * link, restored state, back/forward). Then renders and analyses the reference in memory for the
@@ -86,7 +123,18 @@ class LessonViewModel(
     private val startLesson: StartLesson,
     private val player: AudioPlayer = SilentAudioPlayer(),
     private val analysisDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    private val recorder: AudioRecorder = SilentAudioRecorder(),
+    /** Saves the attempt and its progress together: `RecordAttempt` (#53) in the app. */
+    private val saveAttempt: suspend (Song, NewAttempt) -> RecordAttemptResult = { _, _ -> error("No database") },
+    private val now: () -> Long = { 0L },
 ) : ViewModel() {
+    private val _recording = MutableStateFlow<RecordingUiState>(RecordingUiState.Idle)
+    val recording: StateFlow<RecordingUiState> = _recording.asStateFlow()
+    val inputLevel: StateFlow<Float> = recorder.level
+    val elapsedSeconds: StateFlow<Double> = recorder.elapsedSeconds
+
+    /** Progress when the lesson opened, to word the unlock message in the feedback. */
+    private var startProgress: SongProgress? = null
     /** Where reference playback is, for the note highlight; null when stopped. */
     val playbackPositionMs: StateFlow<Long?> = player.positionMs
     val playerState: StateFlow<PlayerState> = player.state
@@ -109,6 +157,7 @@ class LessonViewModel(
                 is StartLessonResult.Locked -> _uiState.value = LessonUiState.Unavailable(result.message)
                 is StartLessonResult.NoSuchPhrase -> _uiState.value = LessonUiState.Unavailable("This phrase isn't available.")
                 is StartLessonResult.Ready -> {
+                    startProgress = result.progress
                     val lesson = LessonState(song, result.phrase)
                     _uiState.value = LessonUiState.Ready(lesson)
                     val synthesizer = Synthesizer()
@@ -122,18 +171,106 @@ class LessonViewModel(
         }
     }
 
-    /** Plays the reference, or stops it if it's already playing. */
+    /** Plays the reference, or stops it if it's already playing. Not while recording. */
     fun toggleListen() {
+        if (_recording.value == RecordingUiState.Recording) return
         val wav = (_uiState.value as? LessonUiState.Ready)?.referenceWav ?: return
         if (player.state.value == PlayerState.Playing) player.stop() else player.play(wav)
     }
 
-    /** Leaving the lesson stops the reference. */
+    /** Starts recording: stops any playback, and asks for the microphone the first time. */
+    fun startRecording() {
+        if (_uiState.value !is LessonUiState.Ready) return
+        if (_recording.value == RecordingUiState.Recording || _recording.value == RecordingUiState.Analyzing) return
+        player.stop()
+        viewModelScope.launch {
+            _recording.value = if (recorder.start()) {
+                RecordingUiState.Recording
+            } else if (recorder.state.value == RecorderState.PermissionDenied) {
+                RecordingUiState.PermissionDenied
+            } else {
+                RecordingUiState.Problem("The microphone couldn't be started. Close other apps that use it and try again.")
+            }
+        }
+    }
+
+    /**
+     * Stops recording, then analyses, scores and saves the attempt, and calls [onSaved] with its
+     * id so the results screen (#47) can open.
+     */
+    fun stopRecording(onSaved: (attemptId: Long) -> Unit) {
+        if (_recording.value != RecordingUiState.Recording) return
+        val ready = _uiState.value as? LessonUiState.Ready ?: return
+        val clip = recorder.stop()
+        if (clip == null) {
+            _recording.value = RecordingUiState.Problem("Nothing was recorded. Tap Record and play the phrase.")
+            return
+        }
+        _recording.value = RecordingUiState.Analyzing
+        viewModelScope.launch {
+            try {
+                val song = ready.lesson.song
+                val phrase = ready.lesson.phrase
+                val detected = AudioAnalyzer(analysisDispatcher).analyze(clip).notes
+                val score = withContext(analysisDispatcher) { PhraseScorer.score(phrase, song.tempoBpm, detected) }
+                val progress = startProgress
+                val context = PhraseContext(
+                    isLastPhrase = phrase.index == song.phrases.lastIndex,
+                    nextPhraseAlreadyUnlocked = progress?.isUnlocked(phrase.index + 1) == true,
+                )
+                val attempt = NewAttempt(
+                    songId = song.id,
+                    phraseIndex = phrase.index,
+                    createdAt = now(),
+                    mode = AttemptMode.Lesson,
+                    expectedNotes = phrase.notes.map { it.pitch!! },
+                    detectedNotes = detected,
+                    // Saving the WAV files under reference/ and recordings/ comes with file storage (#20).
+                    referenceWavPath = null,
+                    userWavPath = null,
+                    scores = AttemptScores(
+                        score = score.score,
+                        rawScore = score.rawScore,
+                        noteAccuracy = score.noteAccuracy,
+                        orderAccuracy = score.orderAccuracy,
+                        timingAccuracy = score.timingAccuracy,
+                        tempoAccuracy = score.tempoAccuracy,
+                        tempoRatio = score.timing.tempoRatio,
+                    ),
+                    feedback = FeedbackGenerator.generate(phrase, detected, score, context),
+                    analysisVersion = AudioAnalyzer.ANALYSIS_VERSION,
+                )
+                when (val result = saveAttempt(song, attempt)) {
+                    is RecordAttemptResult.Recorded -> {
+                        _recording.value = RecordingUiState.Idle
+                        onSaved(result.attemptId)
+                    }
+                    is RecordAttemptResult.Locked -> _recording.value = RecordingUiState.Problem(result.message)
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Nothing was saved, so progress is unchanged.
+                _recording.value = RecordingUiState.Problem("The recording couldn't be analysed. Please try again.")
+            }
+        }
+    }
+
+    /** Clears a message so the student can try again. */
+    fun dismissProblem() {
+        if (_recording.value is RecordingUiState.Problem || _recording.value == RecordingUiState.PermissionDenied) {
+            _recording.value = RecordingUiState.Idle
+        }
+    }
+
+    /** Leaving the lesson stops the reference and throws away an unfinished recording. */
     override fun onCleared() {
         player.stop()
+        recorder.cancel()
     }
 }
 
+@OptIn(ExperimentalTime::class)
 @Composable
 fun LessonScreen(
     songId: String,
@@ -141,9 +278,21 @@ fun LessonScreen(
     container: AppContainer,
     onAttemptAnalyzed: (attemptId: Long) -> Unit,
     viewModel: LessonViewModel = viewModel {
-        LessonViewModel(songId, phraseIndex, container.songCatalog, container.startLesson, container.audioPlayer)
+        LessonViewModel(
+            songId = songId,
+            phraseIndex = phraseIndex,
+            catalog = container.songCatalog,
+            startLesson = container.startLesson,
+            player = container.audioPlayer,
+            recorder = container.audioRecorder,
+            saveAttempt = { song, attempt -> container.recordAttempt(song, attempt) },
+            now = { Clock.System.now().toEpochMilliseconds() },
+        )
     },
 ) {
+    val recording by viewModel.recording.collectAsStateWithLifecycle()
+    val level by viewModel.inputLevel.collectAsStateWithLifecycle()
+    val elapsed by viewModel.elapsedSeconds.collectAsStateWithLifecycle()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val position by viewModel.playbackPositionMs.collectAsStateWithLifecycle()
     val playerState by viewModel.playerState.collectAsStateWithLifecycle()
@@ -159,6 +308,13 @@ fun LessonScreen(
             canListen = current.referenceWav != null,
             playerState = playerState,
             onListen = viewModel::toggleListen,
+            recording = recording,
+            inputLevel = level,
+            elapsedSeconds = elapsed,
+            onRecord = viewModel::startRecording,
+            onStop = { viewModel.stopRecording(onAttemptAnalyzed) },
+            onOpenSettings = container.openAppSettings,
+            onDismiss = viewModel::dismissProblem,
         )
     }
 }
@@ -171,7 +327,15 @@ fun LessonContent(
     canListen: Boolean = false,
     playerState: PlayerState = PlayerState.Idle,
     onListen: () -> Unit = {},
+    recording: RecordingUiState = RecordingUiState.Idle,
+    inputLevel: Float = 0f,
+    elapsedSeconds: Double = 0.0,
+    onRecord: () -> Unit = {},
+    onStop: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
+    onDismiss: () -> Unit = {},
 ) {
+    val busy = recording == RecordingUiState.Recording || recording == RecordingUiState.Analyzing
     // The note sounding during reference playback (#31); null when stopped, which clears it.
     val highlight = PlaybackHighlight(lesson.phrase, lesson.song.tempoBpm).noteAt(playbackPositionMs)
     Column(
@@ -192,7 +356,7 @@ fun LessonContent(
             pickupBeats = lesson.song.pickupBeats,
         )
         // 4. Listen to the reference, with a loading state while it's being made.
-        Button(onClick = onListen, enabled = canListen, modifier = Modifier.fillMaxWidth()) {
+        Button(onClick = onListen, enabled = canListen && !busy, modifier = Modifier.fillMaxWidth()) {
             Text(
                 when {
                     !canListen -> "Preparing the reference…"
@@ -204,11 +368,65 @@ fun LessonContent(
         if (playerState == PlayerState.Error) {
             Text("The reference couldn't be played. Check the volume and try again.", color = MaterialTheme.colorScheme.error)
         }
-        // 5. Recording controls (#34) go here. Reference graphs (#61):
+        // 5. Recording (#34).
+        RecordingControls(recording, inputLevel, elapsedSeconds, onRecord, onStop, onOpenSettings, onDismiss)
+        // Reference graphs (#61):
         if (reference == null) {
             Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         } else {
             GraphSwitcher(reference = reference, yours = null, comparison = null)
+        }
+    }
+}
+
+@Composable
+private fun RecordingControls(
+    recording: RecordingUiState,
+    inputLevel: Float,
+    elapsedSeconds: Double,
+    onRecord: () -> Unit,
+    onStop: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        when (recording) {
+            RecordingUiState.Idle -> {
+                Button(onClick = onRecord, modifier = Modifier.fillMaxWidth()) { Text("Record") }
+                Text(
+                    "Put the phone near the piano, tap Record, play the phrase, then tap Stop. Take as long as you like.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            RecordingUiState.Recording -> {
+                Text("Recording… ${formatElapsed(elapsedSeconds)}", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)
+                LinearProgressIndicator(
+                    progress = { (inputLevel * 4).coerceIn(0f, 1f) },
+                    modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Microphone level" },
+                )
+                if (elapsedSeconds >= AudioRecorder.MAX_SECONDS - 15) {
+                    Text("Recording stops at ${formatElapsed(AudioRecorder.MAX_SECONDS)}.", style = MaterialTheme.typography.bodySmall)
+                }
+                Button(onClick = onStop, modifier = Modifier.fillMaxWidth()) { Text("Stop") }
+            }
+            RecordingUiState.Analyzing -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                CircularProgressIndicator()
+                Text("Analyzing…", style = MaterialTheme.typography.titleMedium)
+            }
+            RecordingUiState.PermissionDenied -> {
+                Text(
+                    "Piano Trainer needs the microphone to hear you play. You can allow it in Settings.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
+                Button(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth()) { Text("Open Settings") }
+                TextButton(onClick = onDismiss) { Text("Not now") }
+            }
+            is RecordingUiState.Problem -> {
+                Text(recording.message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+                Button(onClick = { onDismiss(); onRecord() }, modifier = Modifier.fillMaxWidth()) { Text("Try again") }
+            }
         }
     }
 }

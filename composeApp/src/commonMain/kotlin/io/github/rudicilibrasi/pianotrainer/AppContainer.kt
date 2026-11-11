@@ -26,11 +26,13 @@ import io.github.rudicilibrasi.pianotrainer.database.buildPianoDatabase
  *   `databaseBuilder()` on iOS.
  * @param audioPlayer the platform's player: `AndroidAudioPlayer` or `IosAudioPlayer`.
  * @param audioRecorder the platform's recorder: `AndroidAudioRecorder` or `IosAudioRecorder`.
+ * @param openAppSettings opens this app's page in the system Settings, e.g. to allow the microphone.
  */
 class AppContainer(
     databaseBuilder: RoomDatabase.Builder<PianoDatabase>,
     val audioPlayer: AudioPlayer,
     val audioRecorder: AudioRecorder,
+    val openAppSettings: () -> Unit = {},
 ) {
     val songCatalog: SongCatalog = SongCatalog.bundled()
 
