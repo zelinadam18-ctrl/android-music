@@ -149,6 +149,15 @@ class LessonViewModel(
     val uiState: StateFlow<LessonUiState> = _uiState.asStateFlow()
 
     init {
+        // If the microphone stops on its own (a call, another app taking it), say so.
+        viewModelScope.launch {
+            recorder.state.collect { state ->
+                if (state == RecorderState.Error && _recording.value == RecordingUiState.Recording) {
+                    recorder.cancel()
+                    _recording.value = RecordingUiState.Problem("Recording was interrupted. Tap Try again and play the phrase from the start.")
+                }
+            }
+        }
         viewModelScope.launch {
             val song = try {
                 catalog.loadSongs().firstOrNull { it.id == songId }

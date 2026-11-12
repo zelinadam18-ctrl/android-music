@@ -208,3 +208,45 @@ class LessonRecordingTest {
         assertEquals("2:00", formatElapsed(AudioRecorder.MAX_SECONDS))
     }
 }
+
+class InterruptedRecordingTest {
+
+    private val dispatcher = StandardTestDispatcher()
+
+    @BeforeTest
+    fun setUp() = Dispatchers.setMain(dispatcher)
+
+    @AfterTest
+    fun tearDown() = Dispatchers.resetMain()
+
+    @Test
+    fun anInterruptedRecordingSaysSoAndSavesNothing() = runTest {
+        val catalog = SongCatalog { path ->
+            when (path) {
+                "files/songs/index.json" -> """{ "songs": ["twinkle"] }"""
+                "files/songs/twinkle.json" -> """{ "id": "twinkle", "title": "Twinkle", "tempoBpm": 120, "timeSignature": "4/4",
+                    "key": "C major", "source": "traditional", "license": "Public domain", "sourceVerified": false,
+                    "phrases": ["C4/1 C4/1 G4/1 G4/1"] }"""
+                else -> throw IllegalStateException("missing resource $path")
+            }.encodeToByteArray()
+        }
+        val recorder = FakeRecorder(null)
+        val saved = ArrayList<NewAttempt>()
+        val viewModel = LessonViewModel(
+            songId = "twinkle", phraseIndex = 0, catalog = catalog, startLesson = StartLesson(FakeProgress()),
+            analysisDispatcher = dispatcher, recorder = recorder,
+            saveAttempt = { _, a -> saved += a; error("must not save") },
+        )
+        testScheduler.advanceUntilIdle()
+        viewModel.startRecording()
+        testScheduler.advanceUntilIdle()
+        assertEquals(RecordingUiState.Recording, viewModel.recording.value)
+
+        recorder.state.value = RecorderState.Error // e.g. a phone call
+        testScheduler.advanceUntilIdle()
+        val problem = assertIs<RecordingUiState.Problem>(viewModel.recording.value)
+        assertTrue(problem.message.startsWith("Recording was interrupted."))
+        assertTrue(recorder.cancelled)
+        assertEquals(emptyList(), saved)
+    }
+}

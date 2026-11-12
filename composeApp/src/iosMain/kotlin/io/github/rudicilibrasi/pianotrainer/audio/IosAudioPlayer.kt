@@ -37,6 +37,11 @@ class IosAudioPlayer : AudioPlayer {
     private var player: AVAudioPlayer? = null
     private var ticker: Job? = null
 
+    init {
+        // A call, Siri or unplugged headphones stops playback.
+        AudioSessionEvents.observe { stop() }
+    }
+
     override fun play(wav: ByteArray) {
         val data = wav.usePinned { NSData.create(bytes = it.addressOf(0), length = wav.size.toULong()) }
         start(data)

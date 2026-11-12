@@ -35,6 +35,16 @@ class IosAudioRecorder : AudioRecorder {
     private val buffer = SampleBuffer()
     private var sampleRate = 48000
 
+    init {
+        // An interruption (a call, Siri) ends the take; the lesson tells the student to try again.
+        AudioSessionEvents.observe {
+            if (_state.value == RecorderState.Recording) {
+                finish()
+                _state.value = RecorderState.Error
+            }
+        }
+    }
+
     private suspend fun requestPermission(): Boolean {
         val session = AVAudioSession.sharedInstance()
         if (session.recordPermission == AVAudioSessionRecordPermissionGranted) return true
