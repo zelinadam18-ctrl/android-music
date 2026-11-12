@@ -4,6 +4,7 @@ import androidx.room.RoomDatabase
 import io.github.rudicilibrasi.pianotrainer.audio.AudioPlayer
 import io.github.rudicilibrasi.pianotrainer.audio.AudioRecorder
 import io.github.rudicilibrasi.pianotrainer.data.AppStorage
+import io.github.rudicilibrasi.pianotrainer.data.ReferenceAudioCache
 import io.github.rudicilibrasi.pianotrainer.data.SongCatalog
 import okio.Path.Companion.toPath
 import io.github.rudicilibrasi.pianotrainer.database.AttemptHistory
@@ -40,6 +41,9 @@ class AppContainer(
 ) {
     /** WAV files under `reference/` and `recordings/`, always addressed by relative path. */
     val storage: AppStorage = AppStorage(storageRoot.toPath())
+
+    /** Each phrase's reference audio, rendered from the song data and cached under `reference/` (#21). */
+    val referenceAudio: ReferenceAudioCache = ReferenceAudioCache(storage)
 
     val songCatalog: SongCatalog = SongCatalog.bundled()
 

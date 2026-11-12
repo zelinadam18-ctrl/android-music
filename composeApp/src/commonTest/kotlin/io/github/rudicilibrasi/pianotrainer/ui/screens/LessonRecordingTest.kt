@@ -8,7 +8,13 @@ import io.github.rudicilibrasi.pianotrainer.core.audio.SynthNote
 import io.github.rudicilibrasi.pianotrainer.core.audio.Synthesizer
 import io.github.rudicilibrasi.pianotrainer.core.progress.Progression
 import io.github.rudicilibrasi.pianotrainer.core.progress.SongProgress
+import io.github.rudicilibrasi.pianotrainer.core.audio.Wav
+import io.github.rudicilibrasi.pianotrainer.data.AppStorage
+import io.github.rudicilibrasi.pianotrainer.data.ReferenceAudioCache
 import io.github.rudicilibrasi.pianotrainer.data.SongCatalog
+import io.github.rudicilibrasi.pianotrainer.data.StoredFile
+import okio.Path.Companion.toPath
+import okio.fakefilesystem.FakeFileSystem
 import io.github.rudicilibrasi.pianotrainer.database.AttemptMode
 import io.github.rudicilibrasi.pianotrainer.database.NewAttempt
 import io.github.rudicilibrasi.pianotrainer.database.RecordAttemptResult
@@ -126,7 +132,34 @@ class LessonRecordingTest {
         assertEquals(listOf("C4", "C4", "G4", "G4"), attempt.detectedNotes.map { it.pitch!!.label })
         assertEquals("You scored 100/100. The next phrase is now unlocked.", attempt.feedback.summary)
         assertEquals(1_000L, attempt.createdAt)
-        assertNull(attempt.userWavPath, "WAV files come with file storage (#20)")
+        assertNull(attempt.userWavPath, "no storage in this test")
+    }
+
+    @Test
+    fun withStorageTheReferenceIsCachedAndTheTakeIsSaved() = runTest {
+        val storage = AppStorage("/app".toPath(), FakeFileSystem())
+        val saved = ArrayList<NewAttempt>()
+        val viewModel = LessonViewModel(
+            songId = "twinkle", phraseIndex = 0, catalog = catalog, startLesson = StartLesson(FakeProgress()),
+            analysisDispatcher = dispatcher, recorder = FakeRecorder(perfectTake),
+            saveAttempt = { song, attempt -> saved += attempt; RecordAttemptResult.Recorded(1, Progression.recordScore(SongProgress.initial(song), 0, attempt.scores.score)) },
+            now = { 1_794_232_980_000L },
+            references = ReferenceAudioCache(storage),
+            saveRecording = storage::write,
+        )
+        testScheduler.advanceUntilIdle()
+        viewModel.startRecording()
+        testScheduler.advanceUntilIdle()
+        viewModel.stopRecording {}
+        testScheduler.advanceUntilIdle()
+
+        val attempt = saved.single()
+        assertEquals("recordings/2026-11-09T14-03-00_twinkle_p1.wav", attempt.userWavPath)
+        assertTrue(attempt.referenceWavPath!!.startsWith("reference/twinkle_p1_"))
+        // Both files are really there, and the recording is the take.
+        val take = assertIs<StoredFile.Found>(storage.read(attempt.userWavPath!!))
+        assertEquals(perfectTake.samples.size, Wav.decode(take.bytes).samples.size)
+        assertIs<StoredFile.Found>(storage.read(attempt.referenceWavPath!!))
     }
 
     @Test

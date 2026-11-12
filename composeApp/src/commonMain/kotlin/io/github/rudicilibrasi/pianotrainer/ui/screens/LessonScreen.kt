@@ -50,6 +50,8 @@ import io.github.rudicilibrasi.pianotrainer.audio.PlayerState
 import io.github.rudicilibrasi.pianotrainer.audio.SilentAudioPlayer
 import io.github.rudicilibrasi.pianotrainer.core.music.Phrase
 import io.github.rudicilibrasi.pianotrainer.core.music.Song
+import io.github.rudicilibrasi.pianotrainer.data.AppStorage
+import io.github.rudicilibrasi.pianotrainer.data.ReferenceAudioCache
 import io.github.rudicilibrasi.pianotrainer.data.SongCatalog
 import io.github.rudicilibrasi.pianotrainer.database.StartLesson
 import io.github.rudicilibrasi.pianotrainer.database.StartLessonResult
@@ -127,7 +129,12 @@ class LessonViewModel(
     /** Saves the attempt and its progress together: `RecordAttempt` (#53) in the app. */
     private val saveAttempt: suspend (Song, NewAttempt) -> RecordAttemptResult = { _, _ -> error("No database") },
     private val now: () -> Long = { 0L },
+    /** The reference cache (#21); without one the reference is rendered in memory each time. */
+    private val references: ReferenceAudioCache? = null,
+    /** Saves a recording's WAV under a relative path (#20); returns false if it couldn't. */
+    private val saveRecording: (relativePath: String, wav: ByteArray) -> Boolean = { _, _ -> false },
 ) : ViewModel() {
+    private var referencePath: String? = null
     private val _recording = MutableStateFlow<RecordingUiState>(RecordingUiState.Idle)
     val recording: StateFlow<RecordingUiState> = _recording.asStateFlow()
     val inputLevel: StateFlow<Float> = recorder.level
@@ -160,9 +167,11 @@ class LessonViewModel(
                     startProgress = result.progress
                     val lesson = LessonState(song, result.phrase)
                     _uiState.value = LessonUiState.Ready(lesson)
-                    val synthesizer = Synthesizer()
                     val wav = runCatching {
-                        withContext(analysisDispatcher) { Wav.encode(synthesizer.renderPhrase(result.phrase, song.tempoBpm), synthesizer.sampleRate) }
+                        withContext(analysisDispatcher) {
+                            references?.reference(song.id, result.phrase, song.tempoBpm)?.also { referencePath = it.path }?.wav
+                                ?: Synthesizer().let { Wav.encode(it.renderPhrase(result.phrase, song.tempoBpm), it.sampleRate) }
+                        }
                     }.getOrNull()
                     val reference = wav?.let { runCatching { AudioAnalyzer(analysisDispatcher).analyze(it) }.getOrNull() }
                     _uiState.value = LessonUiState.Ready(lesson, reference, wav)
@@ -211,6 +220,12 @@ class LessonViewModel(
             try {
                 val song = ready.lesson.song
                 val phrase = ready.lesson.phrase
+                val createdAt = now()
+                // Keep the take as a WAV under recordings/ (#20); the attempt still saves if this fails.
+                val recordingPath = withContext(analysisDispatcher) {
+                    AppStorage.recordingPath(isoTime(createdAt), song.id, phrase.number)
+                        .takeIf { saveRecording(it, Wav.encode(clip)) }
+                }
                 val detected = AudioAnalyzer(analysisDispatcher).analyze(clip).notes
                 val score = withContext(analysisDispatcher) { PhraseScorer.score(phrase, song.tempoBpm, detected) }
                 val progress = startProgress
@@ -221,13 +236,12 @@ class LessonViewModel(
                 val attempt = NewAttempt(
                     songId = song.id,
                     phraseIndex = phrase.index,
-                    createdAt = now(),
+                    createdAt = createdAt,
                     mode = AttemptMode.Lesson,
                     expectedNotes = phrase.notes.map { it.pitch!! },
                     detectedNotes = detected,
-                    // Saving the WAV files under reference/ and recordings/ comes with file storage (#20).
-                    referenceWavPath = null,
-                    userWavPath = null,
+                    referenceWavPath = referencePath,
+                    userWavPath = recordingPath,
                     scores = AttemptScores(
                         score = score.score,
                         rawScore = score.rawScore,
@@ -287,6 +301,8 @@ fun LessonScreen(
             recorder = container.audioRecorder,
             saveAttempt = { song, attempt -> container.recordAttempt(song, attempt) },
             now = { Clock.System.now().toEpochMilliseconds() },
+            references = container.referenceAudio,
+            saveRecording = container.storage::write,
         )
     },
 ) {
@@ -430,3 +446,7 @@ internal fun RecordingControls(
         }
     }
 }
+
+/** "2026-10-25T17:03:12.512Z" for a time in epoch milliseconds, for recording file names. */
+@OptIn(ExperimentalTime::class)
+internal fun isoTime(epochMillis: Long): String = kotlin.time.Instant.fromEpochMilliseconds(epochMillis).toString()

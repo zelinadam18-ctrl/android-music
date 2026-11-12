@@ -33,6 +33,8 @@ import io.github.rudicilibrasi.pianotrainer.core.music.Phrase
 import io.github.rudicilibrasi.pianotrainer.core.scoring.FeedbackGenerator
 import io.github.rudicilibrasi.pianotrainer.core.scoring.PhraseContext
 import io.github.rudicilibrasi.pianotrainer.core.scoring.PhraseScorer
+import io.github.rudicilibrasi.pianotrainer.data.AppStorage
+import io.github.rudicilibrasi.pianotrainer.data.ReferenceAudioCache
 import io.github.rudicilibrasi.pianotrainer.database.AttemptMode
 import io.github.rudicilibrasi.pianotrainer.database.AttemptScores
 import io.github.rudicilibrasi.pianotrainer.database.FreePractice
@@ -66,7 +68,10 @@ class FreePracticeViewModel(
     private val random: Random = Random.Default,
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val now: () -> Long = { 0L },
+    private val references: ReferenceAudioCache? = null,
+    private val saveRecording: (relativePath: String, wav: ByteArray) -> Boolean = { _, _ -> false },
 ) : ViewModel() {
+    private var referencePath: String? = null
     private val _uiState = MutableStateFlow(FreePracticeUiState(FreePractice.newPhrase(random)))
     val uiState: StateFlow<FreePracticeUiState> = _uiState.asStateFlow()
     private val _recording = MutableStateFlow<RecordingUiState>(RecordingUiState.Idle)
@@ -91,9 +96,14 @@ class FreePracticeViewModel(
     private fun renderReference() {
         val phrase = _uiState.value.phrase
         viewModelScope.launch {
-            val synthesizer = Synthesizer()
-            val wav = withContext(dispatcher) { Wav.encode(synthesizer.renderPhrase(phrase, FreePractice.TEMPO_BPM), synthesizer.sampleRate) }
-            if (_uiState.value.phrase === phrase) _uiState.value = _uiState.value.copy(referenceWav = wav)
+            val audio = withContext(dispatcher) { references?.reference(null, phrase, FreePractice.TEMPO_BPM) }
+            val wav = audio?.wav ?: withContext(dispatcher) {
+                Synthesizer().let { Wav.encode(it.renderPhrase(phrase, FreePractice.TEMPO_BPM), it.sampleRate) }
+            }
+            if (_uiState.value.phrase === phrase) {
+                referencePath = audio?.path
+                _uiState.value = _uiState.value.copy(referenceWav = wav)
+            }
         }
     }
 
@@ -126,6 +136,10 @@ class FreePracticeViewModel(
         _recording.value = RecordingUiState.Analyzing
         viewModelScope.launch {
             try {
+                val createdAt = now()
+                val recordingPath = withContext(dispatcher) {
+                    AppStorage.recordingPath(isoTime(createdAt), null, null).takeIf { saveRecording(it, Wav.encode(clip)) }
+                }
                 val detected = AudioAnalyzer(dispatcher).analyze(clip).notes
                 val score = withContext(dispatcher) { PhraseScorer.score(phrase, FreePractice.TEMPO_BPM, detected) }
                 // Free Practice unlocks nothing, so the summary is just the score.
@@ -135,12 +149,12 @@ class FreePracticeViewModel(
                     NewAttempt(
                         songId = null,
                         phraseIndex = null,
-                        createdAt = now(),
+                        createdAt = createdAt,
                         mode = AttemptMode.FreePractice,
                         expectedNotes = phrase.notes.map { it.pitch!! },
                         detectedNotes = detected,
-                        referenceWavPath = null,
-                        userWavPath = null,
+                        referenceWavPath = referencePath,
+                        userWavPath = recordingPath,
                         scores = AttemptScores(score.score, score.rawScore, score.noteAccuracy, score.orderAccuracy, score.timingAccuracy, score.tempoAccuracy, score.timing.tempoRatio),
                         feedback = feedback,
                         analysisVersion = AudioAnalyzer.ANALYSIS_VERSION,
@@ -177,6 +191,8 @@ fun FreePracticeScreen(
             recorder = container.audioRecorder,
             saveAttempt = { container.recordFreePractice(it) },
             now = { Clock.System.now().toEpochMilliseconds() },
+            references = container.referenceAudio,
+            saveRecording = container.storage::write,
         )
     },
 ) {
