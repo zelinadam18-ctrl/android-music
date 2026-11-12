@@ -1,0 +1,23 @@
+{
+  "id": "ode-to-joy",
+  "title": "Ode to Joy",
+  "composer": "Ludwig van Beethoven",
+  "tempoBpm": 100,
+  "timeSignature": "4/4",
+  "key": "C major",
+  "source": "https://imslp.org/wiki/Symphony_No.9,_Op.125_(Beethoven,_Ludwig_van)",
+  "license": "Public domain",
+  "sourceVerified": false,
+  "arrangerNotes": "The 16-bar main theme from the finale of Symphony No. 9, right hand only, transposed to C major. Two bars per phrase; the middle section's bars 9-10 are split one bar per phrase to stay within 4-8 notes.",
+  "phrases": [
+    "E4/1 E4/1 F4/1 G4/1 G4/1 F4/1 E4/1 D4/1",
+    "C4/1 C4/1 D4/1 E4/1 E4/1.5 D4/0.5 D4/2",
+    "E4/1 E4/1 F4/1 G4/1 G4/1 F4/1 E4/1 D4/1",
+    "C4/1 C4/1 D4/1 E4/1 D4/1.5 C4/0.5 C4/2",
+    "D4/1 D4/1 E4/1 C4/1",
+    "D4/1 E4/0.5 F4/0.5 E4/1 C4/1",
+    "D4/1 E4/0.5 F4/0.5 E4/1 D4/1 C4/1 D4/1 G3/2",
+    "E4/1 E4/1 F4/1 G4/1 G4/1 F4/1 E4/1 D4/1",
+    "C4/1 C4/1 D4/1 E4/1 D4/1.5 C4/0.5 C4/2"
+  ]
+}

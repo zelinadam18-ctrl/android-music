@@ -1,0 +1,18 @@
+{
+  "id": "mary-had-a-little-lamb",
+  "title": "Mary Had a Little Lamb",
+  "composer": null,
+  "tempoBpm": 100,
+  "timeSignature": "4/4",
+  "key": "C major",
+  "source": "traditional",
+  "license": "Public domain",
+  "sourceVerified": false,
+  "arrangerNotes": "Right-hand melody only. Phrases follow the lyric lines: \"Mary had a little lamb\" / \"little lamb, little lamb\" / \"Mary had a little lamb\" / \"its fleece was white as snow\".",
+  "phrases": [
+    "E4/1 D4/1 C4/1 D4/1 E4/1 E4/1 E4/2",
+    "D4/1 D4/1 D4/2 E4/1 G4/1 G4/2",
+    "E4/1 D4/1 C4/1 D4/1 E4/1 E4/1 E4/1",
+    "E4/1 D4/1 D4/1 E4/1 D4/1 C4/4"
+  ]
+}

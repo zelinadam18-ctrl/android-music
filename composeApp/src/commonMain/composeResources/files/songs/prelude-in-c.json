@@ -1,0 +1,22 @@
+{
+  "id": "prelude-in-c",
+  "title": "Prelude in C Major (opening)",
+  "composer": "Johann Sebastian Bach",
+  "tempoBpm": 60,
+  "timeSignature": "4/4",
+  "key": "C major",
+  "source": "https://imslp.org/wiki/Das_wohltemperierte_Klavier_I,_BWV_846-869_(Bach,_Johann_Sebastian)",
+  "license": "Public domain",
+  "sourceVerified": false,
+  "arrangerNotes": "Bars 1-4 of BWV 846 (a complete cadence), right-hand figure only, one half-bar figure per phrase. Each phrase keeps the eighth rest where the left hand plays in the original, so the rhythm stays faithful. Play without the sustain pedal so each note can be heard separately.",
+  "phrases": [
+    "R/0.5 G4/0.25 C5/0.25 E5/0.25 G4/0.25 C5/0.25 E5/0.25",
+    "R/0.5 G4/0.25 C5/0.25 E5/0.25 G4/0.25 C5/0.25 E5/0.25",
+    "R/0.5 A4/0.25 D5/0.25 F5/0.25 A4/0.25 D5/0.25 F5/0.25",
+    "R/0.5 A4/0.25 D5/0.25 F5/0.25 A4/0.25 D5/0.25 F5/0.25",
+    "R/0.5 G4/0.25 D5/0.25 F5/0.25 G4/0.25 D5/0.25 F5/0.25",
+    "R/0.5 G4/0.25 D5/0.25 F5/0.25 G4/0.25 D5/0.25 F5/0.25",
+    "R/0.5 G4/0.25 C5/0.25 E5/0.25 G4/0.25 C5/0.25 E5/0.25",
+    "R/0.5 G4/0.25 C5/0.25 E5/0.25 G4/0.25 C5/0.25 E5/0.25"
+  ]
+}
