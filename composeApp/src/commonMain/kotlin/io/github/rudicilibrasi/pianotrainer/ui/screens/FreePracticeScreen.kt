@@ -225,7 +225,7 @@ fun FreePracticeScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         NoteLetters(state.phrase, highlight)
-        StaffView(state.phrase.events, highlightNoteIndex = highlight)
+        StaffView(state.phrase.events, highlightNoteIndex = highlight, description = staffDescription(state.phrase, "Free practice notes"))
         Button(onClick = viewModel::toggleListen, enabled = state.referenceWav != null && !busy, modifier = Modifier.fillMaxWidth()) {
             Text(
                 when {

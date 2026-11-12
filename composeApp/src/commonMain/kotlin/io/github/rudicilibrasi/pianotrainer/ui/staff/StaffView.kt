@@ -77,6 +77,8 @@ internal object Glyph {
  * @param pickupBeats the song's pickup length, so bar lines fall in the right places.
  * @param scrollState shared with another staff so the two scroll together (see [ComparedStaves]).
  * @param minWidthSpaces draw at least this wide, in staff spaces, e.g. to match a second staff.
+ * @param description what screen readers say for the staff, e.g. "Phrase 2: F4, F4, E4, …";
+ *   by default the notes in order.
  */
 @Composable
 fun StaffView(
@@ -89,6 +91,7 @@ fun StaffView(
     staffSpace: Dp = 9.dp,
     scrollState: ScrollState = rememberScrollState(),
     minWidthSpaces: Double = 0.0,
+    description: String? = null,
 ) {
     val layout = remember(events, timeSignature, phraseStartBeat, pickupBeats) {
         StaffLayout(events, timeSignature, phraseStartBeat, pickupBeats)
@@ -101,14 +104,14 @@ fun StaffView(
     val labelStyle = MaterialTheme.typography.labelMedium
     val ink = MaterialTheme.colorScheme.onSurface
     val highlight = MaterialTheme.colorScheme.primary
-    val description = "Treble staff" + (timeSignature?.let { " in $it" } ?: "") + ": " +
-        layout.events.joinToString(", ") { it.label ?: "rest" }
+    val spoken = description ?: ("Treble staff" + (timeSignature?.let { " in $it" } ?: "") + ": " +
+        layout.events.joinToString(", ") { it.label ?: "rest" })
 
     Canvas(
         modifier = modifier
             .horizontalScroll(scrollState)
             .size(staffSpace * maxOf(layout.width, minWidthSpaces).toFloat(), staffSpace * layout.height.toFloat())
-            .semantics { contentDescription = description },
+            .semantics { contentDescription = spoken },
     ) {
         fun px(spaces: Double) = (spaces * spacePx).toFloat()
 

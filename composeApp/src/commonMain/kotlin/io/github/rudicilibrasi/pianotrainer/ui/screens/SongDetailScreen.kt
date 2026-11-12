@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -231,7 +232,8 @@ fun PhraseRow(row: PhraseRowState, onClick: () -> Unit, modifier: Modifier = Mod
     Card(
         onClick = onClick,
         enabled = row.unlocked,
-        modifier = modifier.fillMaxWidth().alpha(if (row.unlocked) 1f else 0.6f),
+        modifier = modifier.fillMaxWidth().alpha(if (row.unlocked) 1f else 0.6f)
+            .semantics { stateDescription = if (row.unlocked) "Unlocked" else "Locked" },
     ) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {

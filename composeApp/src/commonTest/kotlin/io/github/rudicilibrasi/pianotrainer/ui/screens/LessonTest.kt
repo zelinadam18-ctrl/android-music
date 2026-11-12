@@ -119,3 +119,14 @@ class RecordingPlayer : io.github.rudicilibrasi.pianotrainer.audio.AudioPlayer {
         state.value = io.github.rudicilibrasi.pianotrainer.audio.PlayerState.Idle
     }
 }
+
+class StaffDescriptionTest {
+    @Test
+    fun readsThePhraseNumberAndItsNotes() {
+        val phrase = io.github.rudicilibrasi.pianotrainer.core.music.Phrase(
+            1, io.github.rudicilibrasi.pianotrainer.core.music.SongFormat.parseEvents("F4/1 F4/1 E4/1 E4/1 R/1 D4/1 D4/1 C4/2"), 0.0,
+        )
+        assertEquals("Phrase 2: F4, F4, E4, E4, D4, D4, C4", staffDescription(phrase))
+        assertEquals("Free practice notes: F4, F4, E4, E4, D4, D4, C4", staffDescription(phrase, "Free practice notes"))
+    }
+}

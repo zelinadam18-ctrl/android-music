@@ -43,6 +43,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -375,6 +377,7 @@ fun LessonContent(
         // 3. The phrase on the staff.
         StaffView(
             lesson.phrase.events,
+            description = staffDescription(lesson.phrase),
             highlightNoteIndex = highlight,
             timeSignature = lesson.song.timeSignature,
             phraseStartBeat = lesson.phrase.startBeat,
@@ -425,7 +428,13 @@ internal fun RecordingControls(
                 )
             }
             RecordingUiState.Recording -> {
-                Text("Recording… ${formatElapsed(elapsedSeconds)}", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)
+                Text(
+                    "Recording… ${formatElapsed(elapsedSeconds)}",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    // Announced when recording starts; the ticking time isn't read out every second.
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite; contentDescription = "Recording" },
+                )
                 LinearProgressIndicator(
                     progress = { (inputLevel * 4).coerceIn(0f, 1f) },
                     modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Microphone level" },
@@ -437,19 +446,25 @@ internal fun RecordingControls(
             }
             RecordingUiState.Analyzing -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 CircularProgressIndicator()
-                Text("Analyzing…", style = MaterialTheme.typography.titleMedium)
+                Text("Analyzing…", style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
             }
             RecordingUiState.PermissionDenied -> {
                 Text(
                     "Piano Trainer needs the microphone to hear you play. You can allow it in Settings.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
                 )
                 Button(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth()) { Text("Open Settings") }
                 TextButton(onClick = onDismiss) { Text("Not now") }
             }
             is RecordingUiState.Problem -> {
-                Text(recording.message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+                Text(
+                    recording.message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                )
                 Button(onClick = { onDismiss(); onRecord() }, modifier = Modifier.fillMaxWidth()) { Text("Try again") }
             }
         }
@@ -459,3 +474,7 @@ internal fun RecordingControls(
 /** "2026-10-25T17:03:12.512Z" for a time in epoch milliseconds, for recording file names. */
 @OptIn(ExperimentalTime::class)
 internal fun isoTime(epochMillis: Long): String = kotlin.time.Instant.fromEpochMilliseconds(epochMillis).toString()
+
+/** What screen readers say for a phrase's staff: "Phrase 2: F4, F4, E4, E4, D4, D4, C4" (#68). */
+fun staffDescription(phrase: io.github.rudicilibrasi.pianotrainer.core.music.Phrase, title: String = "Phrase ${phrase.number}"): String =
+    "$title: " + phrase.notes.joinToString(", ") { it.pitch!!.label }
