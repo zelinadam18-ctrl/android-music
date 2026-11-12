@@ -380,7 +380,7 @@ fun LessonContent(
 }
 
 @Composable
-private fun RecordingControls(
+internal fun RecordingControls(
     recording: RecordingUiState,
     inputLevel: Float,
     elapsedSeconds: Double,
