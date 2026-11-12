@@ -10,7 +10,7 @@ import io.github.rudicilibrasi.pianotrainer.database.databaseBuilder
 class PianoTrainerApplication : Application() {
     val recorder: AndroidAudioRecorder by lazy { AndroidAudioRecorder(this) }
 
-    val container: AppContainer by lazy { AppContainer(databaseBuilder(this), AndroidAudioPlayer(this), recorder, openAppSettings = ::openAppSettings) }
+    val container: AppContainer by lazy { AppContainer(databaseBuilder(this), AndroidAudioPlayer(this), recorder, openAppSettings = ::openAppSettings, storageRoot = filesDir.absolutePath) }
 
     /** This app's page in Settings, where the student can allow the microphone. */
     private fun openAppSettings() {

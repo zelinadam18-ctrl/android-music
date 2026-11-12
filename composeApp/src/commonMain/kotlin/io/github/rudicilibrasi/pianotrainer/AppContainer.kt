@@ -3,7 +3,9 @@ package io.github.rudicilibrasi.pianotrainer
 import androidx.room.RoomDatabase
 import io.github.rudicilibrasi.pianotrainer.audio.AudioPlayer
 import io.github.rudicilibrasi.pianotrainer.audio.AudioRecorder
+import io.github.rudicilibrasi.pianotrainer.data.AppStorage
 import io.github.rudicilibrasi.pianotrainer.data.SongCatalog
+import okio.Path.Companion.toPath
 import io.github.rudicilibrasi.pianotrainer.database.AttemptHistory
 import io.github.rudicilibrasi.pianotrainer.database.AttemptRepository
 import io.github.rudicilibrasi.pianotrainer.database.PianoDatabase
@@ -27,13 +29,18 @@ import io.github.rudicilibrasi.pianotrainer.database.buildPianoDatabase
  * @param audioPlayer the platform's player: `AndroidAudioPlayer` or `IosAudioPlayer`.
  * @param audioRecorder the platform's recorder: `AndroidAudioRecorder` or `IosAudioRecorder`.
  * @param openAppSettings opens this app's page in the system Settings, e.g. to allow the microphone.
+ * @param storageRoot the app's private folder for WAV files: Android `filesDir`, iOS Application Support.
  */
 class AppContainer(
     databaseBuilder: RoomDatabase.Builder<PianoDatabase>,
     val audioPlayer: AudioPlayer,
     val audioRecorder: AudioRecorder,
     val openAppSettings: () -> Unit = {},
+    storageRoot: String,
 ) {
+    /** WAV files under `reference/` and `recordings/`, always addressed by relative path. */
+    val storage: AppStorage = AppStorage(storageRoot.toPath())
+
     val songCatalog: SongCatalog = SongCatalog.bundled()
 
     private val database: PianoDatabase by lazy { buildPianoDatabase(databaseBuilder) }
