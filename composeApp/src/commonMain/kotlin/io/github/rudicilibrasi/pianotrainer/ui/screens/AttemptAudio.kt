@@ -20,6 +20,9 @@ import io.github.rudicilibrasi.pianotrainer.database.Attempt
 import io.github.rudicilibrasi.pianotrainer.ui.graphs.ComparisonInput
 import io.github.rudicilibrasi.pianotrainer.ui.graphs.GraphSwitcher
 
+/** Shown wherever playback fails, with what to try next (#67). */
+const val PLAYBACK_FAILED = "The audio couldn't be played. Check the volume and that no other app is using the speaker, then try again."
+
 /** A saved recording, ready to play and draw, or why it can't be. */
 sealed interface SavedRecording {
     class Available(val wav: ByteArray, val analysis: AnalysisResult) : SavedRecording
@@ -81,7 +84,7 @@ class AttemptAudio(val reference: SavedRecording, val yours: SavedRecording) {
  * unavailable says "Recording unavailable" in place of its player and graphs (#64).
  */
 @Composable
-fun AttemptAudioSection(audio: AttemptAudio?, comparison: ComparisonInput?, onPlay: (ByteArray) -> Unit) {
+fun AttemptAudioSection(audio: AttemptAudio?, comparison: ComparisonInput?, onPlay: (ByteArray) -> Unit, playbackFailed: Boolean = false) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (audio == null) {
             Text("Loading the recordings…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -92,6 +95,9 @@ fun AttemptAudioSection(audio: AttemptAudio?, comparison: ComparisonInput?, onPl
             }
             (audio.yours as? SavedRecording.Unavailable)?.let {
                 Text(it.message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (playbackFailed) {
+                Text(PLAYBACK_FAILED, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
             }
         }
         GraphSwitcher(

@@ -394,7 +394,7 @@ fun LessonContent(
             )
         }
         if (playerState == PlayerState.Error) {
-            Text("The reference couldn't be played. Check the volume and try again.", color = MaterialTheme.colorScheme.error)
+            Text(PLAYBACK_FAILED, color = MaterialTheme.colorScheme.error)
         }
         // 5. Recording (#34).
         RecordingControls(recording, inputLevel, elapsedSeconds, onRecord, onStop, onOpenSettings, onDismiss)

@@ -235,6 +235,7 @@ fun FreePracticeScreen(
                 },
             )
         }
+        if (playerState == PlayerState.Error) Text(PLAYBACK_FAILED, color = MaterialTheme.colorScheme.error)
         RecordingControls(
             recording, level, elapsed,
             onRecord = viewModel::startRecording,

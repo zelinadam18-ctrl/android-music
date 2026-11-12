@@ -31,6 +31,7 @@ import io.github.rudicilibrasi.pianotrainer.core.progress.Progression
 import io.github.rudicilibrasi.pianotrainer.core.scoring.PhraseScore
 import io.github.rudicilibrasi.pianotrainer.core.scoring.PhraseScorer
 import io.github.rudicilibrasi.pianotrainer.audio.AudioPlayer
+import io.github.rudicilibrasi.pianotrainer.audio.PlayerState
 import io.github.rudicilibrasi.pianotrainer.audio.SilentAudioPlayer
 import io.github.rudicilibrasi.pianotrainer.core.analysis.AudioAnalyzer
 import io.github.rudicilibrasi.pianotrainer.data.AppStorage
@@ -140,6 +141,8 @@ class PhraseResultsViewModel(
 
     fun play(wav: ByteArray) = player.play(wav)
 
+    val playerState: StateFlow<PlayerState> = player.state
+
     override fun onCleared() {
         player.stop()
     }
@@ -213,6 +216,7 @@ fun PhraseResultsScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val audio by viewModel.audio.collectAsStateWithLifecycle()
+    val playerState by viewModel.playerState.collectAsStateWithLifecycle()
     when (val current = state) {
         PhraseResultsUiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         is PhraseResultsUiState.Error -> Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
@@ -230,6 +234,7 @@ fun PhraseResultsScreen(
             onContinue = { viewModel.continueOn(onNextPhrase, onSongComplete) },
             audio = audio,
             onPlay = viewModel::play,
+            playbackFailed = playerState == PlayerState.Error,
         )
     }
 }
@@ -242,6 +247,7 @@ fun PhraseResultsContent(
     onContinue: () -> Unit,
     audio: AttemptAudio? = null,
     onPlay: (ByteArray) -> Unit = {},
+    playbackFailed: Boolean = false,
 ) {
     val detail = state.detail
     Column(
@@ -284,6 +290,7 @@ fun PhraseResultsContent(
             audio,
             if (phrase != null && comparison != null && song != null) ComparisonInput(phrase, song.tempoBpm, state.attempt.detectedNotes, comparison) else null,
             onPlay,
+            playbackFailed,
         )
     }
 }

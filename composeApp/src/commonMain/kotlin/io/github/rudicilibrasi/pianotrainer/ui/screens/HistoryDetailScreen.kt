@@ -26,6 +26,7 @@ import io.github.rudicilibrasi.pianotrainer.core.music.NoteEvent
 import io.github.rudicilibrasi.pianotrainer.core.music.Song
 import io.github.rudicilibrasi.pianotrainer.core.music.TimeSignature
 import io.github.rudicilibrasi.pianotrainer.audio.AudioPlayer
+import io.github.rudicilibrasi.pianotrainer.audio.PlayerState
 import io.github.rudicilibrasi.pianotrainer.audio.SilentAudioPlayer
 import io.github.rudicilibrasi.pianotrainer.core.scoring.PhraseScorer
 import io.github.rudicilibrasi.pianotrainer.data.AppStorage
@@ -148,6 +149,8 @@ class HistoryDetailViewModel(
 
     fun play(wav: ByteArray) = player.play(wav)
 
+    val playerState: StateFlow<PlayerState> = player.state
+
     override fun onCleared() {
         player.stop()
     }
@@ -199,12 +202,13 @@ fun HistoryDetailScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val audio by viewModel.audio.collectAsStateWithLifecycle()
     val comparison by viewModel.comparison.collectAsStateWithLifecycle()
+    val playerState by viewModel.playerState.collectAsStateWithLifecycle()
     when (val current = state) {
         HistoryDetailUiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         is HistoryDetailUiState.Error -> Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
             Text(current.message, textAlign = TextAlign.Center)
         }
-        is HistoryDetailUiState.Loaded -> HistoryDetailContent(current.detail, audio, comparison, viewModel::play)
+        is HistoryDetailUiState.Loaded -> HistoryDetailContent(current.detail, audio, comparison, viewModel::play, playerState == PlayerState.Error)
     }
 }
 
@@ -214,6 +218,7 @@ fun HistoryDetailContent(
     audio: AttemptAudio? = null,
     comparison: ComparisonInput? = null,
     onPlay: (ByteArray) -> Unit = {},
+    playbackFailed: Boolean = false,
 ) {
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -245,6 +250,6 @@ fun HistoryDetailContent(
             detail.toImprove.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium) }
         }
         // Playback and graphs; a missing recording says so instead (#64).
-        AttemptAudioSection(audio, comparison, onPlay)
+        AttemptAudioSection(audio, comparison, onPlay, playbackFailed)
     }
 }
