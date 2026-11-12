@@ -25,7 +25,15 @@ import io.github.rudicilibrasi.pianotrainer.core.analysis.AudioAnalyzer
 import io.github.rudicilibrasi.pianotrainer.core.music.NoteEvent
 import io.github.rudicilibrasi.pianotrainer.core.music.Song
 import io.github.rudicilibrasi.pianotrainer.core.music.TimeSignature
+import io.github.rudicilibrasi.pianotrainer.audio.AudioPlayer
+import io.github.rudicilibrasi.pianotrainer.audio.SilentAudioPlayer
+import io.github.rudicilibrasi.pianotrainer.core.scoring.PhraseScorer
+import io.github.rudicilibrasi.pianotrainer.data.AppStorage
+import io.github.rudicilibrasi.pianotrainer.data.ReferenceAudioCache
 import io.github.rudicilibrasi.pianotrainer.data.SongCatalog
+import io.github.rudicilibrasi.pianotrainer.ui.graphs.ComparisonInput
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import io.github.rudicilibrasi.pianotrainer.database.Attempt
 import io.github.rudicilibrasi.pianotrainer.database.AttemptHistory
 import io.github.rudicilibrasi.pianotrainer.ui.staff.StaffView
@@ -122,9 +130,27 @@ class HistoryDetailViewModel(
     private val catalog: SongCatalog,
     private val history: AttemptHistory,
     private val timeZone: TimeZone = TimeZone.currentSystemDefault(),
+    private val storage: AppStorage? = null,
+    private val references: ReferenceAudioCache? = null,
+    private val player: AudioPlayer = SilentAudioPlayer(),
+    private val analysisDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<HistoryDetailUiState>(HistoryDetailUiState.Loading)
     val uiState: StateFlow<HistoryDetailUiState> = _uiState.asStateFlow()
+
+    /** The saved recordings, loaded after the details; null while loading. */
+    private val _audio = MutableStateFlow<AttemptAudio?>(null)
+    val audio: StateFlow<AttemptAudio?> = _audio.asStateFlow()
+
+    /** The phrase and score behind the comparison graph, when the song still has these notes. */
+    private val _comparison = MutableStateFlow<ComparisonInput?>(null)
+    val comparison: StateFlow<ComparisonInput?> = _comparison.asStateFlow()
+
+    fun play(wav: ByteArray) = player.play(wav)
+
+    override fun onCleared() {
+        player.stop()
+    }
 
     init {
         viewModelScope.launch {
@@ -142,6 +168,14 @@ class HistoryDetailViewModel(
                     } else {
                         null
                     }
+                    val song = songId?.let(songs::get)
+                    val phrase = phraseIndex?.let { song?.phrases?.getOrNull(it) }?.takeIf { p -> p.notes.map { it.pitch } == attempt.expectedNotes }
+                    if (phrase != null && song != null) {
+                        _comparison.value = ComparisonInput(phrase, song.tempoBpm, attempt.detectedNotes, PhraseScorer.score(phrase, song.tempoBpm, attempt.detectedNotes))
+                    }
+                    viewModelScope.launch {
+                        _audio.value = AttemptAudio.load(attempt, phrase, song?.tempoBpm, storage, references, AudioAnalyzer(analysisDispatcher))
+                    }
                     HistoryDetailUiState.Loaded(HistoryDetailState.of(attempt, songs, timeZone).copy(trend = trend))
                 }
             } catch (e: Exception) {
@@ -155,20 +189,32 @@ class HistoryDetailViewModel(
 fun HistoryDetailScreen(
     attemptId: Long,
     container: AppContainer,
-    viewModel: HistoryDetailViewModel = viewModel { HistoryDetailViewModel(attemptId, container.songCatalog, container.attemptHistory) },
+    viewModel: HistoryDetailViewModel = viewModel {
+        HistoryDetailViewModel(
+            attemptId, container.songCatalog, container.attemptHistory,
+            storage = container.storage, references = container.referenceAudio, player = container.audioPlayer,
+        )
+    },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val audio by viewModel.audio.collectAsStateWithLifecycle()
+    val comparison by viewModel.comparison.collectAsStateWithLifecycle()
     when (val current = state) {
         HistoryDetailUiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         is HistoryDetailUiState.Error -> Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
             Text(current.message, textAlign = TextAlign.Center)
         }
-        is HistoryDetailUiState.Loaded -> HistoryDetailContent(current.detail)
+        is HistoryDetailUiState.Loaded -> HistoryDetailContent(current.detail, audio, comparison, viewModel::play)
     }
 }
 
 @Composable
-fun HistoryDetailContent(detail: HistoryDetailState) {
+fun HistoryDetailContent(
+    detail: HistoryDetailState,
+    audio: AttemptAudio? = null,
+    comparison: ComparisonInput? = null,
+    onPlay: (ByteArray) -> Unit = {},
+) {
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -198,6 +244,7 @@ fun HistoryDetailContent(detail: HistoryDetailState) {
             Text("What to improve", style = MaterialTheme.typography.titleSmall)
             detail.toImprove.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium) }
         }
-        // Graphs (#61) and playback of the saved recordings (#22, #23) go here.
+        // Playback and graphs; a missing recording says so instead (#64).
+        AttemptAudioSection(audio, comparison, onPlay)
     }
 }

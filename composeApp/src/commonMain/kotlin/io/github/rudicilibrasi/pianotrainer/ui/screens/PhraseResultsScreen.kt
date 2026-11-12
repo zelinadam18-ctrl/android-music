@@ -30,7 +30,14 @@ import io.github.rudicilibrasi.pianotrainer.core.music.Song
 import io.github.rudicilibrasi.pianotrainer.core.progress.Progression
 import io.github.rudicilibrasi.pianotrainer.core.scoring.PhraseScore
 import io.github.rudicilibrasi.pianotrainer.core.scoring.PhraseScorer
+import io.github.rudicilibrasi.pianotrainer.audio.AudioPlayer
+import io.github.rudicilibrasi.pianotrainer.audio.SilentAudioPlayer
+import io.github.rudicilibrasi.pianotrainer.core.analysis.AudioAnalyzer
+import io.github.rudicilibrasi.pianotrainer.data.AppStorage
+import io.github.rudicilibrasi.pianotrainer.data.ReferenceAudioCache
 import io.github.rudicilibrasi.pianotrainer.data.SongCatalog
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import io.github.rudicilibrasi.pianotrainer.database.Attempt
 import io.github.rudicilibrasi.pianotrainer.database.AttemptHistory
 import io.github.rudicilibrasi.pianotrainer.database.AttemptMode
@@ -38,7 +45,6 @@ import io.github.rudicilibrasi.pianotrainer.database.ProgressReader
 import io.github.rudicilibrasi.pianotrainer.database.StartLesson
 import io.github.rudicilibrasi.pianotrainer.database.StartLessonResult
 import io.github.rudicilibrasi.pianotrainer.ui.graphs.ComparisonInput
-import io.github.rudicilibrasi.pianotrainer.ui.graphs.GraphSwitcher
 import io.github.rudicilibrasi.pianotrainer.ui.staff.ComparedStaves
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -120,9 +126,23 @@ class PhraseResultsViewModel(
     private val progress: ProgressReader,
     private val startLesson: StartLesson,
     private val timeZone: TimeZone = TimeZone.currentSystemDefault(),
+    private val storage: AppStorage? = null,
+    private val references: ReferenceAudioCache? = null,
+    private val player: AudioPlayer = SilentAudioPlayer(),
+    private val analysisDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<PhraseResultsUiState>(PhraseResultsUiState.Loading)
     val uiState: StateFlow<PhraseResultsUiState> = _uiState.asStateFlow()
+
+    /** The reference and the student's recording, for playback and graphs; null while loading. */
+    private val _audio = MutableStateFlow<AttemptAudio?>(null)
+    val audio: StateFlow<AttemptAudio?> = _audio.asStateFlow()
+
+    fun play(wav: ByteArray) = player.play(wav)
+
+    override fun onCleared() {
+        player.stop()
+    }
 
     init {
         viewModelScope.launch {
@@ -139,7 +159,11 @@ class PhraseResultsViewModel(
                     } else {
                         null
                     }
-                    PhraseResultsUiState.Loaded(PhraseResultsState.of(attempt, songs, trend, timeZone))
+                    val state = PhraseResultsState.of(attempt, songs, trend, timeZone)
+                    viewModelScope.launch {
+                        _audio.value = AttemptAudio.load(attempt, state.phrase, state.song?.tempoBpm, storage, references, AudioAnalyzer(analysisDispatcher))
+                    }
+                    PhraseResultsUiState.Loaded(state)
                 }
             } catch (e: Exception) {
                 PhraseResultsUiState.Error("The results couldn't be loaded.\n(${e.message})")
@@ -181,10 +205,14 @@ fun PhraseResultsScreen(
     onNextPhrase: (songId: String, phraseIndex: Int) -> Unit,
     onSongComplete: (songId: String) -> Unit,
     viewModel: PhraseResultsViewModel = viewModel {
-        PhraseResultsViewModel(attemptId, container.songCatalog, container.attemptHistory, container.progress, container.startLesson)
+        PhraseResultsViewModel(
+            attemptId, container.songCatalog, container.attemptHistory, container.progress, container.startLesson,
+            storage = container.storage, references = container.referenceAudio, player = container.audioPlayer,
+        )
     },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val audio by viewModel.audio.collectAsStateWithLifecycle()
     when (val current = state) {
         PhraseResultsUiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         is PhraseResultsUiState.Error -> Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
@@ -200,12 +228,21 @@ fun PhraseResultsScreen(
                 if (songId != null && phraseIndex != null) onRetry(songId, phraseIndex) else onRetryFreePractice()
             },
             onContinue = { viewModel.continueOn(onNextPhrase, onSongComplete) },
+            audio = audio,
+            onPlay = viewModel::play,
         )
     }
 }
 
 @Composable
-fun PhraseResultsContent(state: PhraseResultsState, message: String?, onRetry: () -> Unit, onContinue: () -> Unit) {
+fun PhraseResultsContent(
+    state: PhraseResultsState,
+    message: String?,
+    onRetry: () -> Unit,
+    onContinue: () -> Unit,
+    audio: AttemptAudio? = null,
+    onPlay: (ByteArray) -> Unit = {},
+) {
     val detail = state.detail
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -241,9 +278,12 @@ fun PhraseResultsContent(state: PhraseResultsState, message: String?, onRetry: (
         val song = state.song
         if (phrase != null && comparison != null && song != null) {
             ComparedStaves(phrase, comparison.alignment, state.attempt.detectedNotes, timeSignature = song.timeSignature, pickupBeats = song.pickupBeats)
-            // The per-recording graphs join once the reference (#21) and the recording (#20) can be analysed here.
-            GraphSwitcher(reference = null, yours = null, comparison = ComparisonInput(phrase, song.tempoBpm, state.attempt.detectedNotes, comparison))
         }
-        // Playback of the reference and the recording (#22, #23) goes here.
+        // Play the reference and the recording, and all four graphs (#61); a missing recording says so (#64).
+        AttemptAudioSection(
+            audio,
+            if (phrase != null && comparison != null && song != null) ComparisonInput(phrase, song.tempoBpm, state.attempt.detectedNotes, comparison) else null,
+            onPlay,
+        )
     }
 }
