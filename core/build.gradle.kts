@@ -20,9 +20,6 @@ kotlin {
         withHostTest {}
     }
 
-    iosArm64()
-    iosSimulatorArm64()
-
     // Only used to run the tests quickly on macOS, Windows and Linux (`./gradlew :core:jvmTest`).
     // There is no desktop app.
     jvm {
@@ -41,4 +38,12 @@ kotlin {
             implementation(libs.kotlinx.coroutines.test)
         }
     }
+}
+
+// The JVM tests read the bundled songs from composeApp. Declare them as an input so that changing a
+// song re-runs the tests instead of reusing a cached result.
+tasks.named<Test>("jvmTest") {
+    inputs.dir(rootProject.layout.projectDirectory.dir("composeApp/src/commonMain/composeResources/files/songs"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+        .withPropertyName("bundledSongs")
 }

@@ -65,8 +65,8 @@ data class PlayedSlot(
 )
 
 /**
- * Where the played notes go on the second staff (#46): each one under the expected note it was
- * aligned with (#41), extra notes between their neighbours, and a marked gap for each missed
+ * Where the played notes go on the second staff (#44): each one under the expected note it was
+ * aligned with (#39), extra notes between their neighbours, and a marked gap for each missed
  * note. Uses the expected staff's [StaffLayout] for horizontal positions and the same vertical
  * scale, so the two staves read as one comparison.
  */
@@ -140,7 +140,7 @@ class DetectedStaffModel(val expected: StaffLayout, val slots: List<PlayedSlot>,
 }
 
 /**
- * The expected phrase on one staff and what the student played on a second staff below it (#46),
+ * The expected phrase on one staff and what the student played on a second staff below it (#44),
  * lined up note for note. Played notes are plain note heads (no rhythm), each with a colour and a
  * symbol — ● correct, ✕ wrong, □ missed, ▲ extra, ? not heard clearly — so the outcome never
  * depends on colour alone, and a letter label underneath.

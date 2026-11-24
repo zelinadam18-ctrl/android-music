@@ -29,7 +29,7 @@ fun interface MicrophonePermission {
 }
 
 /**
- * Android recording with AudioRecord (#32): 16-bit PCM mono at 44.1 kHz (48 kHz if the device
+ * Android recording with AudioRecord (#31): 16-bit PCM mono at 44.1 kHz (48 kHz if the device
  * refuses 44.1). Uses the UNPROCESSED source when the device supports it, otherwise
  * VOICE_RECOGNITION; both avoid the automatic gain and noise suppression that distort pitch and
  * loudness.

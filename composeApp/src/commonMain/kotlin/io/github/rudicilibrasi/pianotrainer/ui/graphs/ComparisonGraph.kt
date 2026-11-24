@@ -34,7 +34,7 @@ import io.github.rudicilibrasi.pianotrainer.core.music.Pitch
 import io.github.rudicilibrasi.pianotrainer.core.scoring.AlignmentStep
 import io.github.rudicilibrasi.pianotrainer.core.scoring.PhraseScore
 
-/** How a note fared in the alignment (#41). */
+/** How a note fared in the alignment (#39). */
 enum class NoteOutcome(val label: String) {
     Correct("correct"),
     Wrong("wrong note"),
@@ -61,8 +61,8 @@ data class CompareBar(
 data class PairLine(val expectedX: Float, val expectedRow: Int, val playedX: Float, val playedRow: Int?, val outcome: NoteOutcome)
 
 /**
- * What the reference-vs-you graph draws (#60): expected and played notes on the same piano-roll
- * rows, played times mapped back through the tempo fit from #42 so a slower performance still
+ * What the reference-vs-you graph draws (#58): expected and played notes on the same piano-roll
+ * rows, played times mapped back through the tempo fit from #40 so a slower performance still
  * lines up (or left as recorded when [aligned] is false), lines joining each aligned pair, and an
  * outcome for every note.
  */
@@ -171,7 +171,7 @@ data class ComparisonModel(
 }
 
 /**
- * Expected and played notes against time (spec §9, §11, #60), so the student can see wrong
+ * Expected and played notes against time (spec §9, §11, #58), so the student can see wrong
  * notes, order mistakes, and early or late notes. A toggle switches between times matched to the
  * reference's tempo and raw recorded times.
  */

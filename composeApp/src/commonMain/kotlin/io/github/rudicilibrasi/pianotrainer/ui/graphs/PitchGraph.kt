@@ -34,7 +34,7 @@ import kotlin.math.log2
 data class NoteBar(val startX: Float, val endX: Float, val row: Int?, val uncertain: Boolean, val label: String)
 
 /**
- * What the piano-roll pitch graph draws (#59), in 0–1 fractions, so it can be tested without
+ * What the piano-roll pitch graph draws (#57), in 0–1 fractions, so it can be tested without
  * drawing: one row per semitone (at least G3–G5, widened to fit every note), seconds across.
  *
  * @property rows MIDI numbers from the top row down.
@@ -121,7 +121,7 @@ data class PitchGraphModel(
 }
 
 /**
- * A graph a beginner can read (spec §9, #59): which notes were played, and when. Piano-roll
+ * A graph a beginner can read (spec §9, #57): which notes were played, and when. Piano-roll
  * style, with note names up the side and seconds along the bottom; each detected note is a bar,
  * uncertain notes are hatched, and a thin line shows the raw pitch.
  */

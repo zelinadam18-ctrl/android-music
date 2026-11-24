@@ -89,7 +89,7 @@ class StftTest {
         Stft.compute(samples, 44100) // warm up
         val elapsed = measureTime { Stft.compute(samples, 44100) }
         println("STFT of 10 s at 44.1 kHz took $elapsed")
-        // Generous bound so slow CI machines don't fail; phones are checked in #39.
+        // Generous bound so slow CI machines don't fail; phones are checked in #37.
         assertTrue(elapsed.inWholeMilliseconds < 3000, "took $elapsed")
     }
 }

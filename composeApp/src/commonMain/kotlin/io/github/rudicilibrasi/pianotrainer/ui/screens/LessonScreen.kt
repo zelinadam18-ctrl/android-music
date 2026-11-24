@@ -68,7 +68,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * What the lesson screen shows about the phrase (spec §4, #30). Everything comes from the song
+ * What the lesson screen shows about the phrase (spec §4, #29). Everything comes from the song
  * model; the screen never builds its own note list.
  */
 data class LessonState(
@@ -96,7 +96,7 @@ sealed interface LessonUiState {
     data class Unavailable(val message: String) : LessonUiState
 }
 
-/** Where the student is in recording an attempt (#34). */
+/** Where the student is in recording an attempt (#32). */
 sealed interface RecordingUiState {
     data object Idle : RecordingUiState
     data object Recording : RecordingUiState
@@ -128,7 +128,7 @@ class LessonViewModel(
     private val player: AudioPlayer = SilentAudioPlayer(),
     private val analysisDispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val recorder: AudioRecorder = SilentAudioRecorder(),
-    /** Saves the attempt and its progress together: `RecordAttempt` (#53) in the app. */
+    /** Saves the attempt and its progress together: `RecordAttempt` (#51) in the app. */
     private val saveAttempt: suspend (Song, NewAttempt) -> RecordAttemptResult = { _, _ -> error("No database") },
     private val now: () -> Long = { 0L },
     /** The reference cache (#21); without one the reference is rendered in memory each time. */
@@ -216,7 +216,7 @@ class LessonViewModel(
 
     /**
      * Stops recording, then analyses, scores and saves the attempt, and calls [onSaved] with its
-     * id so the results screen (#47) can open.
+     * id so the results screen (#45) can open.
      */
     fun stopRecording(onSaved: (attemptId: Long) -> Unit) {
         if (_recording.value != RecordingUiState.Recording) return
@@ -363,7 +363,7 @@ fun LessonContent(
     onDismiss: () -> Unit = {},
 ) {
     val busy = recording == RecordingUiState.Recording || recording == RecordingUiState.Analyzing
-    // The note sounding during reference playback (#31); null when stopped, which clears it.
+    // The note sounding during reference playback (#30); null when stopped, which clears it.
     val highlight = PlaybackHighlight(lesson.phrase, lesson.song.tempoBpm).noteAt(playbackPositionMs)
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -396,9 +396,9 @@ fun LessonContent(
         if (playerState == PlayerState.Error) {
             Text(PLAYBACK_FAILED, color = MaterialTheme.colorScheme.error)
         }
-        // 5. Recording (#34).
+        // 5. Recording (#32).
         RecordingControls(recording, inputLevel, elapsedSeconds, onRecord, onStop, onOpenSettings, onDismiss)
-        // Reference graphs (#61):
+        // Reference graphs (#59):
         if (reference == null) {
             Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         } else {
@@ -475,6 +475,6 @@ internal fun RecordingControls(
 @OptIn(ExperimentalTime::class)
 internal fun isoTime(epochMillis: Long): String = kotlin.time.Instant.fromEpochMilliseconds(epochMillis).toString()
 
-/** What screen readers say for a phrase's staff: "Phrase 2: F4, F4, E4, E4, D4, D4, C4" (#68). */
+/** What screen readers say for a phrase's staff: "Phrase 2: F4, F4, E4, E4, D4, D4, C4" (#66). */
 fun staffDescription(phrase: io.github.rudicilibrasi.pianotrainer.core.music.Phrase, title: String = "Phrase ${phrase.number}"): String =
     "$title: " + phrase.notes.joinToString(", ") { it.pitch!!.label }

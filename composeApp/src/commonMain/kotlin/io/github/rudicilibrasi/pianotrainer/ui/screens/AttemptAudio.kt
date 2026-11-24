@@ -20,7 +20,7 @@ import io.github.rudicilibrasi.pianotrainer.database.Attempt
 import io.github.rudicilibrasi.pianotrainer.ui.graphs.ComparisonInput
 import io.github.rudicilibrasi.pianotrainer.ui.graphs.GraphSwitcher
 
-/** Shown wherever playback fails, with what to try next (#67). */
+/** Shown wherever playback fails, with what to try next (#65). */
 const val PLAYBACK_FAILED = "The audio couldn't be played. Check the volume and that no other app is using the speaker, then try again."
 
 /** A saved recording, ready to play and draw, or why it can't be. */
@@ -29,7 +29,7 @@ sealed interface SavedRecording {
     data class Unavailable(val message: String) : SavedRecording
 }
 
-/** The reference and the student's recording for one saved attempt (#64). */
+/** The reference and the student's recording for one saved attempt (#62). */
 class AttemptAudio(val reference: SavedRecording, val yours: SavedRecording) {
     companion object {
         const val UNAVAILABLE = "Recording unavailable"
@@ -80,8 +80,8 @@ class AttemptAudio(val reference: SavedRecording, val yours: SavedRecording) {
 }
 
 /**
- * Playback of the reference and the student's recording, and the graphs (#61). Whatever is
- * unavailable says "Recording unavailable" in place of its player and graphs (#64).
+ * Playback of the reference and the student's recording, and the graphs (#59). Whatever is
+ * unavailable says "Recording unavailable" in place of its player and graphs (#62).
  */
 @Composable
 fun AttemptAudioSection(audio: AttemptAudio?, comparison: ComparisonInput?, onPlay: (ByteArray) -> Unit, playbackFailed: Boolean = false) {

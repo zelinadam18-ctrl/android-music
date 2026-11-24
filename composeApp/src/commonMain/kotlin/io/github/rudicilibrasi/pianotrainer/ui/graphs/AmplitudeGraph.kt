@@ -61,7 +61,7 @@ data class AmplitudeGraphModel(
 
 /**
  * How loud the recording is over time (spec §9): the RMS level from −60 to 0 dBFS as a filled
- * envelope, with a mark at each detected note start (#58). Works the same for the reference and
+ * envelope, with a mark at each detected note start (#56). Works the same for the reference and
  * the student's recording.
  */
 @Composable

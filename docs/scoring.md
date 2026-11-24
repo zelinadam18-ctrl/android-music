@@ -1,6 +1,6 @@
 # Phrase scoring
 
-How one attempt at a phrase becomes a whole-number score from 0 to 100 (spec §11). The code is in `core/src/commonMain/kotlin/.../core/scoring/`: `Aligner` (alignment), `Timing` (timing and tempo) and `PhraseScorer` (the formula). The weights are a starting point, to be tuned against real piano recordings (#40).
+How one attempt at a phrase becomes a whole-number score from 0 to 100 (spec §11). The code is in `core/src/commonMain/kotlin/.../core/scoring/`: `Aligner` (alignment), `Timing` (timing and tempo) and `PhraseScorer` (the formula). The weights are a starting point, to be tuned against real piano recordings (#38).
 
 ## The formula
 

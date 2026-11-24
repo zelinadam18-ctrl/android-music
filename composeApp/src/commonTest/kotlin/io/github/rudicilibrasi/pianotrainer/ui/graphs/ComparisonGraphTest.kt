@@ -10,7 +10,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** The cases from #41's alignment tests, as the student would see them. */
+/** The cases from #39's alignment tests, as the student would see them. */
 class ComparisonGraphTest {
 
     private val tempo = 120.0 // 500 ms per beat

@@ -7,9 +7,9 @@ import io.github.rudicilibrasi.pianotrainer.core.music.Phrase
 import io.github.rudicilibrasi.pianotrainer.core.analysis.DetectedNote
 
 /**
- * The reference audio, phrases, detection and scoring must all use the same note data (#44):
+ * The reference audio, phrases, detection and scoring must all use the same note data (#42):
  * render a phrase's reference the way the app does (#19, #21), round-trip it through a 16-bit WAV
- * (#18), analyse it (#39) and score it (#43).
+ * (#18), analyse it (#37) and score it (#41).
  */
 object ConsistencyCheck {
     private val synthesizer = Synthesizer()

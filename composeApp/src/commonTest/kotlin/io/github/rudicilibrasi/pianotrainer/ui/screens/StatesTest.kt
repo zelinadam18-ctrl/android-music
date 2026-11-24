@@ -15,7 +15,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-/** The loading, empty and error states of #67, as the screens' view models expose them. */
+/** The loading, empty and error states of #65, as the screens' view models expose them. */
 class StatesTest {
 
     private val dispatcher = StandardTestDispatcher()

@@ -249,7 +249,7 @@ fun HistoryDetailContent(
             Text("What to improve", style = MaterialTheme.typography.titleSmall)
             detail.toImprove.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium) }
         }
-        // Playback and graphs; a missing recording says so instead (#64).
+        // Playback and graphs; a missing recording says so instead (#62).
         AttemptAudioSection(audio, comparison, onPlay, playbackFailed)
     }
 }

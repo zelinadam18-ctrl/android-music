@@ -10,7 +10,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/** Every case from #41's alignment tests, on the detected staff. */
+/** Every case from #39's alignment tests, on the detected staff. */
 class DetectedStaffTest {
 
     private val phrase = Phrase(0, SongFormat.parseEvents("C4/1 D4/1 E4/1 F4/1 G4/1"), 0.0)

@@ -63,7 +63,7 @@ private fun NavDestination?.title(): String = when {
 
 /**
  * The app's screens and how to move between them: a bottom bar for the three top-level tabs, and
- * a top bar with a back button on every other screen (iOS has no system back button).
+ * a top bar with a back button on every other screen.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

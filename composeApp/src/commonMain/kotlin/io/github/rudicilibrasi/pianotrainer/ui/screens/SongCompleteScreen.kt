@@ -43,7 +43,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 
-/** Everything the song completion screen shows (spec §6, §12, #55). */
+/** Everything the song completion screen shows (spec §6, §12, #53). */
 data class SongCompleteState(
     val title: String,
     val completed: Boolean,

@@ -6,7 +6,7 @@ import io.github.rudicilibrasi.pianotrainer.core.music.Pitch
 import kotlin.random.Random
 
 /**
- * The original app's random-note exercise (spec Phase One appendix, #66): a short phrase of
+ * The original app's random-note exercise (spec Phase One appendix, #64): a short phrase of
  * random white keys to play, outside any song.
  */
 object FreePractice {

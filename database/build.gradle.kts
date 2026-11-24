@@ -8,8 +8,8 @@ plugins {
     alias(libs.plugins.kotlinSerialization)
 }
 
-// The app's local database: Room for Kotlin Multiplatform with the bundled SQLite driver, so it
-// behaves the same on Android and iOS. Tests run on the JVM against a temporary database file.
+// The app's local database: Room for Kotlin Multiplatform with the bundled SQLite driver, so the
+// same code runs on Android and in the JVM tests, which use a temporary database file.
 kotlin {
     compilerOptions {
         // Room's generated database constructor is an expect/actual object.
@@ -25,9 +25,6 @@ kotlin {
             jvmTarget = JvmTarget.JVM_11
         }
     }
-
-    iosArm64()
-    iosSimulatorArm64()
 
     // Only used to run the tests on macOS, Windows and Linux (`./gradlew :database:jvmTest`).
     jvm {
@@ -60,5 +57,5 @@ room {
 }
 
 dependencies {
-    listOf("kspAndroid", "kspIosArm64", "kspIosSimulatorArm64", "kspJvm").forEach { add(it, libs.room.compiler) }
+    listOf("kspAndroid", "kspJvm").forEach { add(it, libs.room.compiler) }
 }

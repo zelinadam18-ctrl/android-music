@@ -20,7 +20,7 @@ import io.github.rudicilibrasi.pianotrainer.core.progress.Progression
 import io.github.rudicilibrasi.pianotrainer.database.Attempt
 
 /**
- * How one attempt compares with the other attempts on the same phrase (#65).
+ * How one attempt compares with the other attempts on the same phrase (#63).
  *
  * @property sinceLastText "+8 since last time", "−5 since last time", "Same as last time", or
  *   null for the first attempt.

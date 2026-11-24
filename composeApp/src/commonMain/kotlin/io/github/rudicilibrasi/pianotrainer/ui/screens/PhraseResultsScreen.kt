@@ -55,7 +55,7 @@ import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 
 /**
- * The results of the attempt just recorded (spec §11, §12, #47).
+ * The results of the attempt just recorded (spec §11, §12, #45).
  *
  * @property detail the saved attempt, shown exactly as stored (shared with history detail).
  * @property phrase the song's phrase when it still has the attempt's notes, for the staves and
@@ -63,7 +63,7 @@ import kotlinx.datetime.TimeZone
  * @property comparison the alignment and timing behind the comparison views, recomputed from
  *   the saved notes with the same deterministic scorer.
  * @property canContinue only when the score is at least 50; [PhraseResultsViewModel.continueOn]
- *   checks the next phrase again through [StartLesson] (#53).
+ *   checks the next phrase again through [StartLesson] (#51).
  */
 data class PhraseResultsState(
     val attempt: Attempt,
@@ -285,7 +285,7 @@ fun PhraseResultsContent(
         if (phrase != null && comparison != null && song != null) {
             ComparedStaves(phrase, comparison.alignment, state.attempt.detectedNotes, timeSignature = song.timeSignature, pickupBeats = song.pickupBeats)
         }
-        // Play the reference and the recording, and all four graphs (#61); a missing recording says so (#64).
+        // Play the reference and the recording, and all four graphs (#59); a missing recording says so (#62).
         AttemptAudioSection(
             audio,
             if (phrase != null && comparison != null && song != null) ComparisonInput(phrase, song.tempoBpm, state.attempt.detectedNotes, comparison) else null,

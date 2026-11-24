@@ -57,7 +57,7 @@ data class FreePracticeUiState(val phrase: Phrase, val referenceWav: ByteArray? 
 }
 
 /**
- * The original app's random-note exercise (#66): six random white keys, the same listen → record
+ * The original app's random-note exercise (#64): six random white keys, the same listen → record
  * → results flow as a lesson, saved to history as Free Practice. It never touches song progress:
  * it only gets [saveAttempt], which is `RecordFreePractice`, never `RecordAttempt`.
  */
