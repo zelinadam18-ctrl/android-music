@@ -42,6 +42,17 @@ class GraphChoicesTest {
     }
 
     @Test
+    fun theDefaultSourceExistsWhileTheRecordingsAreStillLoading() {
+        // The results screen opens with the comparison before either recording has loaded; picking
+        // a source from an empty list used to crash it.
+        val choices = GraphChoices.of(reference = null, yours = null, comparison = comparison)
+        assertEquals(emptyList(), choices.sources)
+        assertEquals(GraphSource.You, choices.defaultSource)
+        assertEquals(GraphSource.You, GraphChoices.of(result, result, comparison).defaultSource)
+        assertEquals(GraphSource.Reference, GraphChoices.of(result, null, null).defaultSource)
+    }
+
+    @Test
     fun withNothingThereAreNoGraphs() {
         assertEquals(emptyList(), GraphChoices.of(null, null, null).kinds)
     }
