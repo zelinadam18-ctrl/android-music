@@ -40,6 +40,22 @@ class DetectedStaffTest {
     }
 
     @Test
+    fun aNoteFarBelowThePhraseGetsRoomInsteadOfSpillingOut() {
+        // Seen on a phone: noise detected as G2 under a C4–G4 phrase drew its head below the
+        // staff's canvas, over the legend, with its label on top of the ledger lines.
+        val model = model("G2 D4 E4 F4 G4")
+        val g2 = model.slots[0]
+        val headY = g2.y!!
+        // C4, A3, F3, D3, B2 and G2's own line, through its head.
+        assertEquals(6, g2.ledgerLineYs.size)
+        assertEquals(headY, g2.ledgerLineYs.maxOrNull())
+        assertTrue(model.labelTop > headY + 0.5, "label row ${model.labelTop} below the head at $headY")
+        assertTrue(model.height > model.labelTop)
+        // The rest of the staff doesn't move: the in-range notes keep the expected staff's heights.
+        assertEquals(layout.events.drop(1).map { it.y }, model.slots.drop(1).map { it.y })
+    }
+
+    @Test
     fun aWrongNoteIsAtItsOwnPitchUnderTheExpectedOne() {
         val slot = model("C4 D4 A4 F4 G4").slots[2]
         assertEquals(PlayedMark.Wrong, slot.mark)

@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.drawText
@@ -23,6 +24,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.rudicilibrasi.pianotrainer.core.analysis.AnalysisResult
 import io.github.rudicilibrasi.pianotrainer.core.music.Pitch
+import io.github.rudicilibrasi.pianotrainer.ui.staff.fontGrowth
 import kotlin.math.log2
 
 /**
@@ -124,6 +126,9 @@ data class PitchGraphModel(
  * A graph a beginner can read (spec §9, #57): which notes were played, and when. Piano-roll
  * style, with note names up the side and seconds along the bottom; each detected note is a bar,
  * uncertain notes are hatched, and a thin line shows the raw pitch.
+ *
+ * The graph grows taller with the system font size (up to 2×), so the note names up the side,
+ * which are hidden when a row is too short for them, stay visible at large font sizes.
  */
 @Composable
 fun PitchGraph(result: AnalysisResult, modifier: Modifier = Modifier, height: Dp = 260.dp) {
@@ -132,8 +137,9 @@ fun PitchGraph(result: AnalysisResult, modifier: Modifier = Modifier, height: Dp
     val scheme = MaterialTheme.colorScheme
     val labelStyle = MaterialTheme.typography.labelSmall.copy(color = scheme.onSurfaceVariant)
     val barStyle = MaterialTheme.typography.labelSmall.copy(color = scheme.onPrimary)
+    val scaledHeight = height * fontGrowth(LocalDensity.current.fontScale)
 
-    Canvas(modifier.fillMaxWidth().height(height).semantics { contentDescription = model.description }) {
+    Canvas(modifier.fillMaxWidth().height(scaledHeight).semantics { contentDescription = model.description }) {
         val labelWidth = measurer.measure("G#5", labelStyle).size.width + 6.dp.toPx()
         val timeLabelHeight = measurer.measure("0 s", labelStyle).size.height.toFloat()
         val left = labelWidth
@@ -183,11 +189,9 @@ fun PitchGraph(result: AnalysisResult, modifier: Modifier = Modifier, height: Dp
         }
 
         drawLine(scheme.onSurfaceVariant, Offset(left, plotHeight), Offset(size.width, plotHeight), strokeWidth = 1.dp.toPx())
-        model.ticks.zip(model.tickXs).forEach { (tick, x) ->
-            val text = measurer.measure(tick.label, labelStyle)
-            val textLeft = (px(x) - text.size.width / 2f).coerceIn(left, size.width - text.size.width)
-            drawText(text, topLeft = Offset(textLeft, plotHeight + 4.dp.toPx()))
-        }
+        val texts = model.ticks.map { measurer.measure(it.label, labelStyle) }
+        TimeAxis.labelLefts(model.tickXs.map { px(it) }, texts.map { it.size.width.toFloat() }, left, size.width, 6.dp.toPx())
+            .forEachIndexed { i, textLeft -> textLeft?.let { drawText(texts[i], topLeft = Offset(it, plotHeight + 4.dp.toPx())) } }
     }
 }
 

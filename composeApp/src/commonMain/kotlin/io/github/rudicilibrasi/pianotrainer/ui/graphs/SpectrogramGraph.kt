@@ -146,11 +146,9 @@ fun SpectrogramGraph(result: AnalysisResult, modifier: Modifier = Modifier, heig
             val top = (plotHeight * (1 - y) - text.size.height / 2f).coerceIn(0f, plotHeight - text.size.height)
             drawText(text, topLeft = Offset(0f, top))
         }
-        model.ticks.zip(model.tickXs).forEach { (tick, x) ->
-            val text = measurer.measure(tick.label, labelStyle)
-            val textLeft = (left + x * plotWidth - text.size.width / 2f).coerceIn(left, size.width - text.size.width)
-            drawText(text, topLeft = Offset(textLeft, plotHeight + 4.dp.toPx()))
-        }
+        val texts = model.ticks.map { measurer.measure(it.label, labelStyle) }
+        TimeAxis.labelLefts(model.tickXs.map { left + it * plotWidth }, texts.map { it.size.width.toFloat() }, left, size.width, 6.dp.toPx())
+            .forEachIndexed { i, textLeft -> textLeft?.let { drawText(texts[i], topLeft = Offset(it, plotHeight + 4.dp.toPx())) } }
     }
 }
 

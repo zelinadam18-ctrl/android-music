@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -27,6 +29,7 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import io.github.rudicilibrasi.pianotrainer.core.analysis.AnalysisResult
@@ -143,7 +146,16 @@ private fun <T> SegmentedRow(options: List<T>, selected: T, label: (T) -> String
                 selected = option == selected,
                 onClick = { onSelect(option) },
                 shape = SegmentedButtonDefaults.itemShape(index, options.size),
-                label = { Text(label(option), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                label = {
+                    // Shrinks the text to fit before ellipsizing, so "Spectrogram" stays readable at
+                    // large font sizes instead of becoming "Spectr…".
+                    Text(
+                        label(option),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        autoSize = TextAutoSize.StepBased(minFontSize = 7.sp, maxFontSize = LocalTextStyle.current.fontSize),
+                    )
+                },
             )
         }
     }

@@ -264,6 +264,9 @@ class StaffLayout(
             beat += event.beats
             // A bar line after this event if a bar ends here, unless it's the end of the phrase.
             if (barLength != null && index < phraseEvents.lastIndex && isBarBoundary(beat - pickupBeats, barLength)) {
+                // An up-stem flag sticks out to the right of a short note; keep the bar line clear of
+                // it (e.g. Jingle Bells' "C4. D4 | E4", where the bar used to sit on D4's flag).
+                if (placed.stem?.let { it.up && it.flags > 0 } == true) x += FLAG_WIDTH
                 bars += x - BAR_GAP / 2
                 x += BAR_GAP / 2
             }
