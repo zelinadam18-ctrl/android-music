@@ -28,7 +28,8 @@ data class PhraseContext(val isLastPhrase: Boolean, val nextPhraseAlreadyUnlocke
  * Generates [PhraseFeedback] from a [PhraseScore]. Every message is derived from the alignment and
  * timing measures behind the score, so none can contradict it:
  *
- * - Notes: how many were correct; each missed, wrong and extra note; adjacent notes played the
+ * - Notes: how many were correct; each missed, wrong and extra note (more than
+ *   [MAX_EXTRA_NOTE_MESSAGES] extra notes are summed up in one message); adjacent notes played the
  *   other way round are reported once as a swap. Notes that couldn't be identified reliably are
  *   reported as not heard clearly, never as wrong.
  * - Order: praised only when order accuracy is perfect.
@@ -38,6 +39,9 @@ data class PhraseContext(val isLastPhrase: Boolean, val nextPhraseAlreadyUnlocke
  */
 object FeedbackGenerator {
     const val STEADY_RHYTHM = 0.8
+
+    /** Up to this many extra notes get a message each; more are summed up in one message. */
+    const val MAX_EXTRA_NOTE_MESSAGES = 2
 
     fun generate(
         phrase: Phrase,
@@ -105,6 +109,11 @@ object FeedbackGenerator {
     private fun noteMessages(expected: List<Pitch>, detected: List<DetectedNote>, steps: List<AlignmentStep>): List<String> {
         fun playedPitch(j: Int): Pitch? = detected[j].takeIf { it.isReliable }?.pitch
         val messages = ArrayList<String>()
+        // Many extra notes (often background noise) would bury the useful messages under one bullet
+        // each, so past MAX_EXTRA_NOTE_MESSAGES they're reported once, where the first one occurs.
+        val extraCount = steps.count { it is Insertion }
+        val summariseExtras = extraCount > MAX_EXTRA_NOTE_MESSAGES
+        var extrasReported = false
         var k = 0
         while (k < steps.size) {
             val swap = swapAt(steps, k, expected, ::playedPitch)
@@ -124,9 +133,15 @@ object FeedbackGenerator {
                         "You played $played where ${expected[step.expectedIndex]} was expected (note ${step.expectedIndex + 1})."
                     }
                 }
-                is Insertion -> {
-                    val played = playedPitch(step.detectedIndex)
-                    messages += if (played == null) "We heard an extra note we couldn't identify." else "You added an extra $played."
+                is Insertion -> when {
+                    !summariseExtras -> {
+                        val played = playedPitch(step.detectedIndex)
+                        messages += if (played == null) "We heard an extra note we couldn't identify." else "You added an extra $played."
+                    }
+                    !extrasReported -> {
+                        messages += "We heard $extraCount extra notes. Play only the notes in the phrase, and keep the room quiet while you record."
+                        extrasReported = true
+                    }
                 }
             }
             k++

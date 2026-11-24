@@ -73,6 +73,17 @@ class FeedbackTest {
     }
 
     @Test
+    fun manyExtraNotesAreSummedUpInOneMessage() {
+        // The phrase played correctly, plus a noisy tail of low G2s (as a hum or background noise
+        // can produce): one message instead of one per extra note.
+        val noise = (0 until 12).map { "G2" to 3500.0 + it * 200 }
+        val result = feedback(played(*(listOf("C4", "D4", "E4", "F4", "G4", "A4", "G4").mapIndexed { i, n -> n to i * 500.0 } + noise).toTypedArray()))
+        assertEquals("You played 7 out of 7 notes correctly.", result.wentWell.first())
+        val extras = result.toImprove.filter { "extra" in it }
+        assertEquals(listOf("We heard 12 extra notes. Play only the notes in the phrase, and keep the room quiet while you record."), extras)
+    }
+
+    @Test
     fun twoSwappedNotesAreReportedOnceAsASwap() {
         val result = feedback(played("C4 D4 F4 E4 G4 A4 G4"))
         // Reported once, not as a missed note plus an extra note.
