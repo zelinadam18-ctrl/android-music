@@ -57,6 +57,10 @@ data class GraphChoices(val kinds: List<GraphKind>, val sources: List<GraphSourc
     /** The Reference / Your recording toggle only makes sense with both, and not for Compare. */
     fun showsSourceToggle(kind: GraphKind): Boolean = kind != GraphKind.Compare && sources.size > 1
 
+    /** The recording to show first: the student's when there is one. Defined even with no recordings
+     *  yet (e.g. the results screen while they load, when only Compare is offered). */
+    val defaultSource: GraphSource get() = sources.lastOrNull() ?: GraphSource.You
+
     companion object {
         fun of(reference: AnalysisResult?, yours: AnalysisResult?, comparison: ComparisonInput?): GraphChoices {
             val sources = listOfNotNull(reference?.let { GraphSource.Reference }, yours?.let { GraphSource.You })
@@ -87,10 +91,10 @@ fun GraphSwitcher(
     val choices = GraphChoices.of(reference, yours, comparison)
     if (choices.kinds.isEmpty()) return
     var kind by rememberSaveable { mutableStateOf(choices.kinds.last()) }
-    var source by rememberSaveable { mutableStateOf(choices.sources.last()) }
+    var source by rememberSaveable { mutableStateOf(choices.defaultSource) }
     var expanded by rememberSaveable { mutableStateOf(false) }
     if (kind !in choices.kinds) kind = choices.kinds.last()
-    if (source !in choices.sources && choices.sources.isNotEmpty()) source = choices.sources.last()
+    if (source !in choices.sources && choices.sources.isNotEmpty()) source = choices.defaultSource
 
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SegmentedRow(choices.kinds, kind, { it.label }) { kind = it }
