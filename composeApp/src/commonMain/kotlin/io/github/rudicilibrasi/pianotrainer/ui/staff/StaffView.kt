@@ -151,7 +151,8 @@ fun StaffView(
         }
 
         for (event in layout.events) {
-            val colour = if (event.noteIndex == highlightNoteIndex) highlight else ink
+            // Rests have no note index; without the null check they matched "nothing highlighted".
+            val colour = if (event.noteIndex != null && event.noteIndex == highlightNoteIndex) highlight else ink
             val x = px(event.x)
             val y = event.y
             val dotX = event.dotX
