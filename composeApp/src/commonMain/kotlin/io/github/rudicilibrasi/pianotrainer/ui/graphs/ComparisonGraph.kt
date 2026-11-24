@@ -237,6 +237,11 @@ private fun ComparisonCanvas(model: ComparisonModel, height: Dp) {
                 // Expected: an outline; dashed when it was missed.
                 val effect = if (bar.outcome == NoteOutcome.Missed) PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx())) else null
                 drawRect(colour, Offset(x0, top), Size(width, barHeight), style = Stroke(width = 1.5.dp.toPx(), pathEffect = effect))
+            } else if (bar.row == null) {
+                // Played but not identified: no row to sit in, so a faint full-height band with a
+                // dashed outline. Filled solid, a long one hid most of the graph.
+                drawRect(colour.copy(alpha = 0.12f), Offset(x0, top), Size(width, barHeight))
+                drawRect(colour.copy(alpha = 0.6f), Offset(x0, top), Size(width, barHeight), style = Stroke(width = 1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx()))))
             } else {
                 drawRect(colour.copy(alpha = 0.8f), Offset(x0, top + barHeight * 0.2f), Size(width, barHeight * 0.6f))
             }
