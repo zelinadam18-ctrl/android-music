@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 import kotlin.time.measureTime
 
 /**
- * A rough guard against the analysis getting much slower. The real target (#39) is under 2 s for
+ * A rough guard against the analysis getting much slower. The real target (#37) is under 2 s for
  * a 10-second recording on a mid-range phone; a desktop JVM should be well under that.
  */
 class AnalysisSpeedTest {

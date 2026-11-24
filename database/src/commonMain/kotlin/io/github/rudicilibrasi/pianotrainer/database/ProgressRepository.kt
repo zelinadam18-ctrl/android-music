@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
  * phrases after progress was saved, the saved phrases that still exist are kept and new ones
  * start locked (the first phrase is always unlocked).
  *
- * Only the use-case that records attempts (#53) should call [save].
+ * Only the use-case that records attempts (#51) should call [save].
  */
 class ProgressRepository(private val dao: ProgressDao) : ProgressReader {
 

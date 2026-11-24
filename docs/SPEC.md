@@ -1,6 +1,6 @@
 # Project: Beginner Piano Learning App — Phase Two
 
-This is the product specification for a beginner piano trainer for Android **phones** (not tablets or desktop). The technology choices are recorded in [`decisions/0001-tech-stack.md`](decisions/0001-tech-stack.md), and the work is broken into GitHub issues tracked by the [roadmap issue](https://github.com/rudi-cilibrasi/musicprompt/issues/71).
+This is the product specification for a beginner piano trainer for Android **phones** (not tablets or desktop). The technology choices are recorded in [`decisions/0001-tech-stack.md`](decisions/0001-tech-stack.md), and the work is broken into GitHub issues tracked by the [roadmap issue](https://github.com/zelinadam18-ctrl/android-music/issues/69).
 
 ## Song Sources and Verification
 

@@ -49,7 +49,7 @@ enum class GraphSource(val label: String) { Reference("Reference"), You("Your re
 data class ComparisonInput(val phrase: Phrase, val tempoBpm: Double, val detected: List<DetectedNote>, val score: PhraseScore)
 
 /**
- * Which graphs and sources a screen can show, from the data it has (#61): the lesson screen has
+ * Which graphs and sources a screen can show, from the data it has (#59): the lesson screen has
  * only the reference, so it shows the three per-recording graphs; the results screen also has the
  * student's recording and the comparison, so it shows all four.
  */
@@ -70,7 +70,7 @@ data class GraphChoices(val kinds: List<GraphKind>, val sources: List<GraphSourc
 }
 
 /**
- * All graphs without cluttering a phone screen (spec §9, §15, #61): a segmented control picks
+ * All graphs without cluttering a phone screen (spec §9, §15, #59): a segmented control picks
  * one graph at a time, a Reference / Your recording toggle picks the recording where that applies,
  * and tapping the graph opens it full screen.
  *

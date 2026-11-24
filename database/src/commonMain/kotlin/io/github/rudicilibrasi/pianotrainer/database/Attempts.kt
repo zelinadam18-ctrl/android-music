@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-/** Lesson attempts count towards progress; free-practice attempts never do (#66). */
+/** Lesson attempts count towards progress; free-practice attempts never do (#64). */
 enum class AttemptMode { Lesson, FreePractice }
 
 /** The score and its components, as computed when the attempt was analysed. */
@@ -38,7 +38,7 @@ data class AttemptScores(
  * @property referenceWavPath path relative to the app's storage folder (#20), e.g.
  *   `reference/twinkle_p1_….wav`, or null when there was no reference.
  * @property userWavPath relative path of the student's recording, e.g. `recordings/….wav`.
- * @property analysisVersion which version of the analysis produced [detectedNotes] (#39).
+ * @property analysisVersion which version of the analysis produced [detectedNotes] (#37).
  */
 data class Attempt(
     val id: Long,
@@ -139,7 +139,7 @@ class AttemptRepository(private val dao: AttemptDao) : AttemptHistory {
     /** Attempts on one song, newest first. */
     override fun observeForSong(songId: String): Flow<List<Attempt>> = dao.observeForSong(songId).map { rows -> rows.map { it.toAttempt() } }
 
-    /** Attempts on one phrase, newest first, for comparing with earlier attempts (#65). */
+    /** Attempts on one phrase, newest first, for comparing with earlier attempts (#63). */
     override fun observeForPhrase(songId: String, phraseIndex: Int): Flow<List<Attempt>> =
         dao.observeForPhrase(songId, phraseIndex).map { rows -> rows.map { it.toAttempt() } }
 }

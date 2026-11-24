@@ -1,12 +1,12 @@
 # Piano Trainer
 
-[![CI](https://github.com/rudi-cilibrasi/musicprompt/actions/workflows/ci.yml/badge.svg)](https://github.com/rudi-cilibrasi/musicprompt/actions/workflows/ci.yml)
+[![CI](https://github.com/zelinadam18-ctrl/android-music/actions/workflows/ci.yml/badge.svg)](https://github.com/zelinadam18-ctrl/android-music/actions/workflows/ci.yml)
 
 A beginner piano trainer for Android phones. Students learn real songs phrase by phrase: they listen to a reference, record themselves on a real piano, and get a score and feedback based on pitch detection and timing analysis.
 
 - [Specification](docs/SPEC.md): what the app must do.
 - [Tech-stack decision](docs/decisions/0001-tech-stack.md): Kotlin Multiplatform + Compose Multiplatform.
-- [Roadmap](https://github.com/rudi-cilibrasi/musicprompt/issues/71): every issue, grouped by milestone, with "blocked by" links between them.
+- [Roadmap](https://github.com/zelinadam18-ctrl/android-music/issues/69): every issue, grouped by milestone, with "blocked by" links between them.
 
 ## Project layout
 

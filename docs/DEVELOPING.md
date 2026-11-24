@@ -54,7 +54,7 @@ The app records the student playing a real piano, so you'll want sound input whi
 
 - **Android emulator:** the virtual microphone is off by default. Open *Extended controls (⋯) → Microphone* and turn on **"Virtual microphone uses host audio input"**. It turns itself off again when the emulator restarts.
 
-Emulator audio is resampled and filtered by the host, so it is only good enough for checking that recording works. **Judge recording quality and pitch detection on real phones** with a real piano; see [#40](https://github.com/rudi-cilibrasi/musicprompt/issues/40).
+Emulator audio is resampled and filtered by the host, so it is only good enough for checking that recording works. **Judge recording quality and pitch detection on real phones** with a real piano; see [#38](https://github.com/zelinadam18-ctrl/android-music/issues/38).
 
 ## 4. Troubleshooting
 

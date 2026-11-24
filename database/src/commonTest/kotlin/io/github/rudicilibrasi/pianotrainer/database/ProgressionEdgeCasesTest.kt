@@ -18,7 +18,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 /**
- * The progression rules the spec singles out (§16, §17, #56), end to end through the real
+ * The progression rules the spec singles out (§16, §17, #54), end to end through the real
  * database and the RecordAttempt use case. Scores are fed in directly here; the app itself only
  * ever records scores computed by PhraseScorer.
  */

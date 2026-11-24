@@ -17,7 +17,7 @@ enum class RecorderState {
 }
 
 /**
- * Records the student's playing from the microphone (spec §10, #32). The student decides
+ * Records the student's playing from the microphone (spec §10, #31). The student decides
  * when to stop; recording also stops by itself at [MAX_SECONDS] as a safety limit.
  *
  * The recording comes back in memory as mono samples; saving it as a WAV file under

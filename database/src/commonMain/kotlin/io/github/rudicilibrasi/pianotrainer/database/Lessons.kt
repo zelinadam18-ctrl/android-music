@@ -9,7 +9,7 @@ import io.github.rudicilibrasi.pianotrainer.core.progress.ProgressUpdate
 import io.github.rudicilibrasi.pianotrainer.core.progress.SongProgress
 import kotlinx.coroutines.flow.Flow
 
-/** Read-only access to saved attempts, for history screens (#62, #63). */
+/** Read-only access to saved attempts, for history screens (#60, #61). */
 interface AttemptHistory {
     suspend fun get(id: Long): Attempt?
     fun observeAll(): Flow<List<Attempt>>
@@ -62,7 +62,7 @@ sealed interface RecordAttemptResult {
 
 /**
  * The only way progress changes (spec §5, §13): saves a lesson attempt and applies the phrase
- * progression (#48) and song score and star rules (#49) in **one database transaction**, so the
+ * progression (#46) and song score and star rules (#47) in **one database transaction**, so the
  * attempt and the progress it caused are saved together or not at all.
  *
  * Call it only after analysis has finished successfully; a failed or cancelled analysis never

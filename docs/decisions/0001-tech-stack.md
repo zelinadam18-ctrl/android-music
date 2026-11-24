@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-25
-- Issue: [#1](https://github.com/rudi-cilibrasi/musicprompt/issues/1)
+- Issue: [#1](https://github.com/zelinadam18-ctrl/android-music/issues/1)
 
 ## Context
 

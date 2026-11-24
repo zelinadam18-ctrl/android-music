@@ -9,7 +9,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 
 /**
- * The app's local database (spec §13, §14). Entities for attempts (#51) and progress (#52) are
+ * The app's local database (spec §13, §14). Entities for attempts (#49) and progress (#50) are
  * added here; bump [version] and add a migration when the schema changes after release.
  *
  * Build one with [buildPianoDatabase] from a platform builder: `databaseBuilder(context)` on

@@ -61,17 +61,17 @@ internal object Glyph {
 }
 
 /**
- * A phrase drawn on a treble staff (#25, #26): clef, time signature, staff lines, note heads,
+ * A phrase drawn on a treble staff (#24, #25): clef, time signature, staff lines, note heads,
  * stems, flags, dots, rests, ledger lines, bar lines, and a "C4"-style label under each note,
  * matching the letter list on the lesson screen. Eighths and sixteenths in the same beat are
- * beamed (#27).
+ * beamed (#26).
  *
  * Glyphs come from the Bravura music font (SMuFL, SIL Open Font License; see
  * `files/licenses/bravura-ofl.txt`). A 6–8 note phrase fits a phone in portrait at the default
  * [staffSpace]; longer phrases scroll sideways.
  *
  * @param highlightNoteIndex index among the phrase's notes (rests not counted) to show in the
- *   highlight colour, e.g. the note sounding during reference playback (#31).
+ *   highlight colour, e.g. the note sounding during reference playback (#30).
  * @param timeSignature shown after the clef, and used to place bar lines; null shows neither.
  * @param phraseStartBeat the phrase's start beat from the start of the song (Phrase.startBeat).
  * @param pickupBeats the song's pickup length, so bar lines fall in the right places.

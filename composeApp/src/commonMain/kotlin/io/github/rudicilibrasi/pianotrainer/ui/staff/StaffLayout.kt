@@ -80,14 +80,14 @@ data class PlacedEvent(
 }
 
 /**
- * Where everything goes when a phrase is drawn on a treble staff (#25, #26). Pure arithmetic in
+ * Where everything goes when a phrase is drawn on a treble staff (#24, #25). Pure arithmetic in
  * staff spaces, so it can be tested without drawing anything; [StaffView] multiplies by the size
  * of a staff space on screen.
  *
  * - Note heads, ledger lines and a "C4" label row under the staff.
- * - Stems follow [TrebleStaff] (#24): up below the middle line, down on or above it, 3.5 spaces
+ * - Stems follow [TrebleStaff] (#23): up below the middle line, down on or above it, 3.5 spaces
  *   long. Unbeamed eighths and sixteenths get one or two flags.
- * - Eighths and sixteenths in the same beat are beamed instead (#27): one stem direction per
+ * - Eighths and sixteenths in the same beat are beamed instead (#26): one stem direction per
  *   group from its average position, a beam sloping with the first and last notes (at most one
  *   space), stems lengthened to meet it, and a second beam (or a short beamlet) for sixteenths.
  * - Dotted values get a dot; rests are drawn at their usual heights.

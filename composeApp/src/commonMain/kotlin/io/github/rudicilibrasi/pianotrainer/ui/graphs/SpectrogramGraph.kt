@@ -50,7 +50,7 @@ object Magma {
 }
 
 /**
- * What the spectrogram draws (#57): loudness per time column and frequency row, already mapped
+ * What the spectrogram draws (#55): loudness per time column and frequency row, already mapped
  * to 0–1 and limited to [maxHz].
  *
  * @property intensity `[column][row]`, row 0 the lowest frequency; 0 is [rangeDb] below the
@@ -106,7 +106,7 @@ class SpectrogramModel(
 }
 
 /**
- * Frequency intensity over time (spec §9, #57): time across, frequency up (0–2 kHz, where our
+ * Frequency intensity over time (spec §9, #55): time across, frequency up (0–2 kHz, where our
  * notes and their first partials are), loudness as colour (magma). The image is built once as a
  * small bitmap, one pixel per column and frequency row, and scaled up when drawn, so scrolling
  * stays smooth.

@@ -11,7 +11,7 @@ import io.github.rudicilibrasi.pianotrainer.core.music.SongFormat
  * @property path where the WAV is stored, relative to [AppStorage] (`reference/…`).
  * @property wav the WAV bytes.
  * @property noteStartsMs when each note of the phrase starts (rests not counted), for the note
- *   highlight (#31) and the comparison graph (#60).
+ *   highlight (#30) and the comparison graph (#58).
  */
 class ReferenceAudio(val path: String, val wav: ByteArray, val noteStartsMs: List<Double>)
 

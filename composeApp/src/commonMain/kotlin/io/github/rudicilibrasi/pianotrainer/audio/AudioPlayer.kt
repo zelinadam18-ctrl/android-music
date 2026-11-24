@@ -10,7 +10,7 @@ enum class PlayerState { Idle, Playing, Error }
  * Plays reference audio and recordings (spec §8, #22).
  *
  * Only one sound plays at a time: starting a new one stops the old one. [positionMs] updates at
- * least every 50 ms while playing, for the note highlight (#31), and is null when stopped.
+ * least every 50 ms while playing, for the note highlight (#30), and is null when stopped.
  */
 interface AudioPlayer {
     val state: StateFlow<PlayerState>

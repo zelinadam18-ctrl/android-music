@@ -15,7 +15,7 @@ class StaffLayoutTest {
 
     private val fourFour = TimeSignature(4, 4)
 
-    // --- Pitch (#25) ---
+    // --- Pitch (#24) ---
 
     @Test
     fun twinklePhrase1() {
@@ -68,7 +68,7 @@ class StaffLayoutTest {
         assertTrue(layout.height > layout.labelTop)
     }
 
-    // --- Rhythm (#26) ---
+    // --- Rhythm (#25) ---
 
     @Test
     fun noteValuesAndDotsFromBeats() {

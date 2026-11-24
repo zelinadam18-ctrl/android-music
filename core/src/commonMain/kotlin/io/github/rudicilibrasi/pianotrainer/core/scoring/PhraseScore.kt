@@ -46,7 +46,7 @@ data class PhraseScore(
  * - **Timing accuracy** and **tempo accuracy** come from [Timing]. Tempo has no penalty within
  *   ±15% of the reference tempo.
  *
- * The weights are a starting point, to be tuned against real recordings (#40).
+ * The weights are a starting point, to be tuned against real recordings (#38).
  *
  * Deterministic: the same expected notes and detected notes always give the same score.
  */

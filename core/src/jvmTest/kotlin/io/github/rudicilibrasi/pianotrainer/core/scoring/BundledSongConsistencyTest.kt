@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 import kotlin.test.fail
 
 /**
- * #44 over every bundled song: each phrase's reference scores 100 against itself, and phrase N's
+ * #42 over every bundled song: each phrase's reference scores 100 against itself, and phrase N's
  * reference scores clearly lower as an attempt at phrase N + 1. New songs are included as soon as
  * they are listed in `index.json`.
  */

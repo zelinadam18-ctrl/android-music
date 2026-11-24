@@ -13,7 +13,7 @@ import androidx.compose.ui.text.withStyle
 import io.github.rudicilibrasi.pianotrainer.core.music.Phrase
 
 /**
- * Which note is sounding during reference playback (#31), from the phrase's note start times
+ * Which note is sounding during reference playback (#30), from the phrase's note start times
  * (the same times the reference is rendered from, #21) and the player's position.
  */
 class PlaybackHighlight(phrase: Phrase, tempoBpm: Double) {
