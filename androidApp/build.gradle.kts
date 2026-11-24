@@ -44,6 +44,14 @@ android {
                 "proguard-rules.pro"
             )
         }
+        // Release settings (not debuggable, so it runs at full speed) signed with the local debug
+        // key, for trying the app on your own phone: `./gradlew :androidApp:installPreview`.
+        // It installs over a debug build and keeps its data.
+        create("preview") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11

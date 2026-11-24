@@ -70,6 +70,7 @@ Run these from the repo root. On Windows use `gradlew.bat` (or `.\gradlew` in Po
 |---|---|
 | Build the Android app | `./gradlew :androidApp:assembleDebug` |
 | Install and run on a connected emulator or phone | `./gradlew :androidApp:installDebug`, then open "PianoTrainer" |
+| Install a full-speed build for trying the app | `./gradlew :androidApp:installPreview` (release settings, signed with your debug key; installs over a debug build and keeps its data) |
 | `core` tests (any OS) | `./gradlew :core:jvmTest` |
 | UI tests (any OS) | `./gradlew :composeApp:testAndroidHostTest` |
 | Database tests | `./gradlew :database:jvmTest` (skipped on Intel Macs, see below) |
