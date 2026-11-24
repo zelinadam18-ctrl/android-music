@@ -32,6 +32,36 @@ sdk.dir=/home/<you>/Android/Sdk
 
 Setting the `ANDROID_HOME` environment variable instead also works.
 
+### Without Android Studio (command line only)
+
+Handy on a headless or minimal Linux machine. No root needed; everything goes in your home folder.
+
+```sh
+# JDK 21 (Temurin tarball)
+mkdir -p ~/.local/jdks && cd ~/.local/jdks
+curl -L "https://api.adoptium.net/v3/binary/latest/21/ga/linux/x64/jdk/hotspot/normal/eclipse" | tar xz
+export JAVA_HOME=$(ls -d ~/.local/jdks/jdk-21*/ | head -1)
+
+# Android command-line tools (newest link: https://developer.android.com/studio#command-line-tools-only)
+mkdir -p ~/Android/Sdk/cmdline-tools && cd ~/Android/Sdk/cmdline-tools
+curl -LO https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip
+unzip -q commandlinetools-linux-*_latest.zip && mv cmdline-tools latest
+yes | ~/Android/Sdk/cmdline-tools/latest/bin/sdkmanager --licenses
+~/Android/Sdk/cmdline-tools/latest/bin/sdkmanager platform-tools   # adb
+
+# Back in the repo
+echo "sdk.dir=$HOME/Android/Sdk" > local.properties
+./gradlew :androidApp:assembleDebug
+```
+
+Gradle downloads the SDK Platform and Build-Tools it needs on the first build. For an emulator, also install `emulator` and a system image (e.g. `system-images;android-35;google_apis;x86_64`) with `sdkmanager`, create one with `avdmanager create avd`, and start it with `~/Android/Sdk/emulator/emulator -avd <name>`. On Linux the emulator needs read/write access to `/dev/kvm`.
+
+### Installing on your own phone
+
+1. On the phone: *Settings → About phone →* tap **Build number** 7 times, then turn on *Developer options → USB debugging* (cable) or **Wireless debugging** (same Wi-Fi).
+2. Wireless: tap *Wireless debugging → Pair device with pairing code* and run `adb pair <ip>:<pairing port> <code>`, then `adb connect <ip>:<port>` with the port shown on the main Wireless debugging screen (it is different from the pairing port).
+3. `./gradlew :androidApp:installDebug`, or `adb install -r androidApp/build/outputs/apk/debug/androidApp-debug.apk`.
+
 ## 2. Commands
 
 Run these from the repo root. On Windows use `gradlew.bat` (or `.\gradlew` in PowerShell) instead of `./gradlew`.
