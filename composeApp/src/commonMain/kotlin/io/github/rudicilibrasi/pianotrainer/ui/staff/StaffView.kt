@@ -70,6 +70,9 @@ internal object Glyph {
  * `files/licenses/bravura-ofl.txt`). A 6–8 note phrase fits a phone in portrait at the default
  * [staffSpace]; longer phrases scroll sideways.
  *
+ * The whole staff, note labels included, grows with the system font size (up to 2×), so the
+ * labels stay in proportion to the notes instead of running into each other at large font sizes.
+ *
  * @param highlightNoteIndex index among the phrase's notes (rests not counted) to show in the
  *   highlight colour, e.g. the note sounding during reference playback (#30).
  * @param timeSignature shown after the clef, and used to place bar lines; null shows neither.
@@ -98,10 +101,13 @@ fun StaffView(
     }
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
-    val spacePx = with(density) { staffSpace.toPx() }
+    val space = staffSpace * fontGrowth(density.fontScale)
+    val spacePx = with(density) { space.toPx() }
     // SMuFL fonts are designed so that one em is four staff spaces.
     val music = TextStyle(fontFamily = FontFamily(Font(Res.font.bravura)), fontSize = with(density) { (spacePx * 4).toSp() })
-    val labelStyle = MaterialTheme.typography.labelMedium
+    // Sized in staff spaces like the glyphs (about labelMedium at the default size), so a label
+    // never outgrows the gap between two notes.
+    val labelStyle = MaterialTheme.typography.labelMedium.copy(fontSize = with(density) { (spacePx * LABEL_SIZE_SPACES).toSp() })
     val ink = MaterialTheme.colorScheme.onSurface
     val highlight = MaterialTheme.colorScheme.primary
     val spoken = description ?: ("Treble staff" + (timeSignature?.let { " in $it" } ?: "") + ": " +
@@ -110,7 +116,7 @@ fun StaffView(
     Canvas(
         modifier = modifier
             .horizontalScroll(scrollState)
-            .size(staffSpace * maxOf(layout.width, minWidthSpaces).toFloat(), staffSpace * layout.height.toFloat())
+            .size(space * maxOf(layout.width, minWidthSpaces).toFloat(), space * layout.height.toFloat())
             .semantics { contentDescription = spoken },
     ) {
         fun px(spaces: Double) = (spaces * spacePx).toFloat()
@@ -244,3 +250,9 @@ private fun RhythmPreview() = PianoTrainerTheme {
         timeSignature = TimeSignature(4, 4),
     )
 }
+
+/** How much the staff grows with the system font scale: not below normal size, at most double. */
+internal fun fontGrowth(fontScale: Float): Float = fontScale.coerceIn(1f, 2f)
+
+/** Note-label height in staff spaces: labelMedium (12 sp) on the default 9 dp staff space. */
+internal const val LABEL_SIZE_SPACES = 12f / 9f
