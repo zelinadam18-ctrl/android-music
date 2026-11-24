@@ -145,6 +145,63 @@ class NoteDetectorTest {
         assertNotNull(DetectedNote(Pitch.parse("C4"), 0.0, 100.0, 0.9, uncertain = false).takeIf { it.isReliable })
     }
 
+    /**
+     * Adds a decaying tone: [partials] amplitudes (index 0 = fundamental), each fading with time
+     * constant [decaySeconds] after a 5 ms attack.
+     */
+    private fun addTone(buffer: FloatArray, hz: Double, startSeconds: Double, seconds: Double, partials: List<Double>, decaySeconds: Double) {
+        val start = (startSeconds * sampleRate).toInt()
+        val length = minOf((seconds * sampleRate).toInt(), buffer.size - start)
+        for (i in 0 until length) {
+            val t = i.toDouble() / sampleRate
+            val envelope = minOf(1.0, t / 0.005) * kotlin.math.exp(-t / decaySeconds) * minOf(1.0, (length - i) / 400.0)
+            var sum = 0.0
+            for ((k, amplitude) in partials.withIndex()) sum += amplitude * sin(2 * PI * (k + 1) * hz * t)
+            buffer[start + i] += (0.3 * envelope * sum).toFloat()
+        }
+    }
+
+    @Test
+    fun aDecayingNoteWhoseTailReadsAnOctaveLowIsStillTheNote() {
+        // On a phone recording, a faint component an octave below fades more slowly than the
+        // note itself. It starts 35 dB down, but most of the way through the note it is close
+        // enough that the note repeats at twice its period. The note must be judged while it is
+        // loud.
+        val buffer = FloatArray(sampleRate * 2)
+        val d4 = Pitch.parse("D4")
+        addTone(buffer, d4.frequencyHz, 0.25, 1.4, listOf(1.0, 0.5, 0.3, 0.2), decaySeconds = 0.25)
+        addTone(buffer, d4.frequencyHz / 2, 0.25, 1.4, listOf(0.018), decaySeconds = 3.0)
+        val notes = detector.detect(buffer)
+        assertEquals(listOf(d4), notes.map { it.pitch }, "notes $notes")
+        assertFalse(notes.single().uncertain, "notes $notes")
+    }
+
+    @Test
+    fun aSoftNoteStruckWhileTheLastOneRingsIsTheNewNote() {
+        // C4 still ringing when a softer G4 is struck: together they repeat every C3 period, the
+        // common period of both. The struck note is the harmonic of that period that got louder.
+        val buffer = FloatArray(sampleRate * 2)
+        val c4 = Pitch.parse("C4")
+        val g4 = Pitch.parse("G4")
+        addTone(buffer, c4.frequencyHz, 0.25, 1.6, listOf(1.0, 0.5, 0.3, 0.2), decaySeconds = 1.5)
+        addTone(buffer, g4.frequencyHz, 0.95, 0.9, listOf(0.35, 0.17, 0.1), decaySeconds = 1.5)
+        val notes = detector.detect(buffer)
+        assertEquals(listOf(c4, g4), notes.map { it.pitch }, "notes $notes")
+    }
+
+    @Test
+    fun aPartialSwellingInAHeldNoteIsNotANewNote() {
+        // Partway through a decaying note one upper partial swells up (partials of a real piano
+        // trade energy as the strings couple). The spectrum jumps, but nothing got louder overall:
+        // it isn't a new note.
+        val buffer = FloatArray(sampleRate * 3)
+        val a4 = Pitch.parse("A4")
+        addTone(buffer, a4.frequencyHz, 0.25, 2.5, listOf(1.0, 0.4, 0.0, 0.2), decaySeconds = 0.8)
+        addTone(buffer, a4.frequencyHz * 3, 0.95, 1.8, listOf(0.12), decaySeconds = 0.8)
+        val notes = detector.detect(buffer)
+        assertEquals(listOf(a4), notes.map { it.pitch }, "notes $notes")
+    }
+
     @Test
     fun worksAtOtherSampleRates() {
         val rate = 22050

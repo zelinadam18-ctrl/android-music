@@ -1,6 +1,6 @@
 package io.github.rudicilibrasi.pianotrainer.core.analysis
 
-import io.github.rudicilibrasi.pianotrainer.core.dsp.Fft
+import io.github.rudicilibrasi.pianotrainer.core.dsp.FftPlan
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.roundToInt
@@ -71,37 +71,109 @@ class PitchDetector(
 
     val hopSize: Int = hopSize ?: (sampleRate * 512.0 / 44100).roundToInt().coerceAtLeast(1)
 
+    /**
+     * Cross-correlation length. The window (length [windowSize]) is correlated with the frame for
+     * lags up to [maxLag], so indices reach at most `windowSize − 1 + maxLag = frameSize − 1`:
+     * a circular correlation of at least [frameSize] points never wraps.
+     */
     private val fftSize: Int = run {
         var n = 1
-        while (n < frameSize + windowSize) n = n shl 1
+        while (n < frameSize) n = n shl 1
         n
+    }
+
+    /**
+     * Buffers reused across the frames of one [detect] call. Two slots, because the correlations
+     * of two frames are computed with one inverse FFT.
+     */
+    private inner class Workspace {
+        val plan = FftPlan(fftSize)
+        val x = Array(2) { DoubleArray(frameSize) }
+        val re = Array(2) { DoubleArray(fftSize) }
+        val im = Array(2) { DoubleArray(fftSize) }
+        val prefix = DoubleArray(frameSize + 1)
+        val d = DoubleArray(maxLag + 1)
+        val cmnd = DoubleArray(maxLag + 1)
     }
 
     /** Analyses a whole recording, one [PitchFrame] every [hopSize] samples. */
     fun detect(samples: FloatArray): List<PitchFrame> {
         if (samples.isEmpty()) return emptyList()
         val frameCount = if (samples.size <= frameSize) 1 else 1 + (samples.size - frameSize + hopSize - 1) / hopSize
-        return List(frameCount) { frame ->
-            val start = frame * hopSize
-            analyseFrame(samples, start, (start + frameSize / 2.0) / sampleRate)
+        val workspace = Workspace()
+        val frames = arrayOfNulls<PitchFrame>(frameCount)
+        fun timeOf(frame: Int) = (frame * hopSize + frameSize / 2.0) / sampleRate
+        var pending = -1 // a sounding frame waiting in slot 0 for a partner
+        for (frame in 0 until frameCount) {
+            val slot = if (pending < 0) 0 else 1
+            if (!load(samples, frame * hopSize, workspace.x[slot])) {
+                frames[frame] = PitchFrame(timeOf(frame), null, 0.0)
+                continue
+            }
+            correlationSpectrum(workspace, slot)
+            if (slot == 0) {
+                pending = frame
+                continue
+            }
+            inverseBoth(workspace)
+            frames[pending] = pitchOf(workspace, 0, timeOf(pending))
+            frames[frame] = pitchOf(workspace, 1, timeOf(frame))
+            pending = -1
         }
+        if (pending >= 0) {
+            workspace.plan.transform(workspace.re[0], workspace.im[0])
+            frames[pending] = pitchOf(workspace, 0, timeOf(pending))
+        }
+        @Suppress("UNCHECKED_CAST")
+        return (frames as Array<PitchFrame>).asList()
     }
 
     /** Analyses one frame of [frameSize] samples starting at [start] (zero-padded past the end). */
-    fun detectFrame(samples: FloatArray, start: Int = 0): PitchFrame =
-        analyseFrame(samples, start, (start + frameSize / 2.0) / sampleRate)
+    fun detectFrame(samples: FloatArray, start: Int = 0): PitchFrame {
+        val timeSeconds = (start + frameSize / 2.0) / sampleRate
+        val workspace = Workspace()
+        if (!load(samples, start, workspace.x[0])) return PitchFrame(timeSeconds, null, 0.0)
+        correlationSpectrum(workspace, 0)
+        workspace.plan.transform(workspace.re[0], workspace.im[0])
+        return pitchOf(workspace, 0, timeSeconds)
+    }
 
-    private fun analyseFrame(samples: FloatArray, start: Int, timeSeconds: Double): PitchFrame {
-        val x = DoubleArray(frameSize) { i -> samples.getOrNull(start + i)?.toDouble() ?: 0.0 }
-
+    /** Copies the frame at [start] into [x] (zero-padded past the end). False if it is silent. */
+    private fun load(samples: FloatArray, start: Int, x: DoubleArray): Boolean {
+        for (i in 0 until frameSize) x[i] = if (start + i < samples.size) samples[start + i].toDouble() else 0.0
         var windowEnergy = 0.0
         for (j in 0 until windowSize) windowEnergy += x[j] * x[j]
-        if (sqrt(windowEnergy / windowSize) < silenceRms) return PitchFrame(timeSeconds, null, 0.0)
+        return sqrt(windowEnergy / windowSize) >= silenceRms
+    }
 
-        val d = differenceFunction(x)
+    /**
+     * Combines the correlation spectra in both slots so one forward FFT inverts both. Each
+     * correlation is real, so with Y = P₀ + i·P₁, ifft(Y) = r₀ + i·r₁. The slots hold conj(P₀) and
+     * conj(P₁); the forward FFT of conj(Y) = conj(P₀) − i·conj(P₁) is N·conj(r₀ + i·r₁), so
+     * afterwards slot 0's real part is N·r₀ and minus its imaginary part is N·r₁, which is copied
+     * to slot 1's real part.
+     */
+    private fun inverseBoth(workspace: Workspace) {
+        val re0 = workspace.re[0]
+        val im0 = workspace.im[0]
+        val re1 = workspace.re[1]
+        val im1 = workspace.im[1]
+        for (k in 0 until fftSize) {
+            val newRe = re0[k] + im1[k]
+            val newIm = im0[k] - re1[k]
+            re0[k] = newRe
+            im0[k] = newIm
+        }
+        workspace.plan.transform(re0, im0)
+        for (tau in 0..maxLag) re1[tau] = -im0[tau]
+    }
+
+    /** The pitch of the frame in [slot], whose real part now holds N times its correlation. */
+    private fun pitchOf(workspace: Workspace, slot: Int, timeSeconds: Double): PitchFrame {
+        val d = differenceFunction(workspace, slot)
 
         // Cumulative mean normalised difference.
-        val cmnd = DoubleArray(maxLag + 1)
+        val cmnd = workspace.cmnd
         cmnd[0] = 1.0
         var runningSum = 0.0
         for (tau in 1..maxLag) {
@@ -150,35 +222,63 @@ class PitchDetector(
     }
 
     /**
-     * `d(τ) = e(0) + e(τ) − 2·r(τ)` for τ in 0..maxLag, where `r` is the cross-correlation of the
-     * window with the frame and `e(τ)` the energy of the window shifted by τ.
+     * Fills [slot] with conj(P), where P is the spectrum of the cross-correlation `r` of the
+     * window with the frame, ready for an inverse FFT done as a forward one:
+     * ifft(P) = conj(fft(conj(P))) / N.
      */
-    private fun differenceFunction(x: DoubleArray): DoubleArray {
-        val aRe = DoubleArray(fftSize)
-        val aIm = DoubleArray(fftSize)
-        val xRe = DoubleArray(fftSize)
-        val xIm = DoubleArray(fftSize)
-        for (j in 0 until windowSize) aRe[j] = x[j]
-        for (j in x.indices) xRe[j] = x[j]
-        Fft.transform(aRe, aIm)
-        Fft.transform(xRe, xIm)
-        // conj(A) · X, then an inverse FFT via conjugation: ifft(Z) = conj(fft(conj(Z))) / N.
-        val zRe = DoubleArray(fftSize)
-        val zIm = DoubleArray(fftSize)
-        for (k in 0 until fftSize) {
-            zRe[k] = aRe[k] * xRe[k] + aIm[k] * xIm[k]
-            zIm[k] = -(aRe[k] * xIm[k] - aIm[k] * xRe[k])
+    private fun correlationSpectrum(workspace: Workspace, slot: Int) {
+        val x = workspace.x[slot]
+        val re = workspace.re[slot]
+        val im = workspace.im[slot]
+        val n = fftSize
+        // Both inputs are real, so one complex FFT carries both: the window a as the real part,
+        // the frame x as the imaginary part.
+        for (j in 0 until n) {
+            re[j] = if (j < windowSize) x[j] else 0.0
+            im[j] = if (j < frameSize) x[j] else 0.0
         }
-        Fft.transform(zRe, zIm)
-        val r = DoubleArray(maxLag + 1) { tau -> zRe[tau] / fftSize }
+        workspace.plan.transform(re, im)
+        // Separate them by conjugate symmetry, A[k] = (Z[k] + conj(Z[N−k])) / 2 and
+        // X[k] = (Z[k] − conj(Z[N−k])) / 2i, and form conj(Z′) where Z′ = conj(A) · X, so a
+        // forward FFT gives the inverse: ifft(Z′) = conj(fft(conj(Z′))) / N. Pairs k and N − k are
+        // done together because each needs the other's original values.
+        for (k in 0..n / 2) {
+            val m = (n - k) and (n - 1)
+            val zkRe = re[k]; val zkIm = im[k]
+            val zmRe = re[m]; val zmIm = im[m]
+            fun product(pRe: Double, pIm: Double, qRe: Double, qIm: Double, out: Int) {
+                // A = (p + conj(q)) / 2, X = (p − conj(q)) / 2i, for p = Z[k], q = Z[N−k].
+                val aRe = (pRe + qRe) / 2
+                val aIm = (pIm - qIm) / 2
+                val xRe = (pIm + qIm) / 2
+                val xIm = (qRe - pRe) / 2
+                // conj(A) · X, then conjugated.
+                re[out] = aRe * xRe + aIm * xIm
+                im[out] = -(aRe * xIm - aIm * xRe)
+            }
+            product(zkRe, zkIm, zmRe, zmIm, k)
+            if (m != k) product(zmRe, zmIm, zkRe, zkIm, m)
+        }
+    }
 
-        val prefix = DoubleArray(x.size + 1)
-        for (j in x.indices) prefix[j + 1] = prefix[j] + x[j] * x[j]
+    /**
+     * `d(τ) = e(0) + e(τ) − 2·r(τ)` for τ in 0..maxLag, where `r` is the cross-correlation of the
+     * window with the frame (slot's real part holds N·r) and `e(τ)` the energy of the window
+     * shifted by τ.
+     */
+    private fun differenceFunction(workspace: Workspace, slot: Int): DoubleArray {
+        val x = workspace.x[slot]
+        val re = workspace.re[slot]
+        val n = fftSize
+        val prefix = workspace.prefix
+        for (j in 0 until frameSize) prefix[j + 1] = prefix[j] + x[j] * x[j]
         val e0 = prefix[windowSize]
-        return DoubleArray(maxLag + 1) { tau ->
+        val d = workspace.d
+        for (tau in 0..maxLag) {
             val eTau = prefix[tau + windowSize] - prefix[tau]
-            (e0 + eTau - 2 * r[tau]).coerceAtLeast(0.0)
+            d[tau] = (e0 + eTau - 2 * re[tau] / n).coerceAtLeast(0.0)
         }
+        return d
     }
 
     /** Parabolic interpolation around the minimum at [tau]. */

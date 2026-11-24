@@ -6,6 +6,8 @@ import io.github.rudicilibrasi.pianotrainer.core.dsp.Spectrogram
 import io.github.rudicilibrasi.pianotrainer.core.dsp.Stft
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.coroutineContext
@@ -73,11 +75,24 @@ class AudioAnalyzer(private val dispatcher: CoroutineDispatcher = Dispatchers.De
         val sampleRate = clip.sampleRate
         onProgress(0f)
 
-        val notes = NoteDetector(sampleRate).analyze(samples)
-        coroutineContext.ensureActive()
-        onProgress(0.6f)
-
-        val spectrogram = Stft.compute(samples, sampleRate)
+        // The pitch track, the onsets and the graph spectrogram don't depend on each other, so
+        // they run in parallel (phones have several cores).
+        val detector = NoteDetector(sampleRate)
+        val (notes, spectrogram) = coroutineScope {
+            val spectrogram = async { Stft.compute(samples, sampleRate) }
+            val normalized = detector.normalized(samples)
+            val notes = if (normalized == null) {
+                detector.silence(samples)
+            } else {
+                val onsets = async { detector.onsetDetector.detect(normalized) }
+                val frames = detector.pitchDetector.detect(normalized)
+                coroutineContext.ensureActive()
+                detector.notesFrom(normalized, frames, onsets.await())
+            }
+            coroutineContext.ensureActive()
+            onProgress(0.6f)
+            notes to spectrogram.await()
+        }
         coroutineContext.ensureActive()
         onProgress(0.85f)
 
@@ -149,7 +164,7 @@ class AudioAnalyzer(private val dispatcher: CoroutineDispatcher = Dispatchers.De
          * Bump whenever detection or analysis changes in a way that could change results, so saved
          * history records which algorithm produced it.
          */
-        const val ANALYSIS_VERSION = 1
+        const val ANALYSIS_VERSION = 2
 
         /** Most time columns in any graph. */
         const val MAX_COLUMNS = 400

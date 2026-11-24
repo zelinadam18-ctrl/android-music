@@ -85,10 +85,38 @@ class OnsetDetector(
         val column = FloatArray(magnitudesDb.size)
         return FloatArray(bins) { bin ->
             for (t in magnitudesDb.indices) column[t] = magnitudesDb[t][bin]
-            column.sort()
-            val background = column[(column.size * NOISE_PERCENTILE).toInt().coerceAtMost(column.size - 1)]
+            val background = select(column, (column.size * NOISE_PERCENTILE).toInt().coerceAtMost(column.size - 1))
             max(floorDb.toFloat(), background + NOISE_MARGIN_DB)
         }
+    }
+
+    /**
+     * The value that would be at index [k] if [values] were sorted (Hoare's quickselect, average
+     * linear time instead of a full sort). Reorders [values].
+     */
+    private fun select(values: FloatArray, k: Int): Float {
+        var lo = 0
+        var hi = values.size - 1
+        while (lo < hi) {
+            val pivot = values[(lo + hi) ushr 1]
+            var i = lo
+            var j = hi
+            while (i <= j) {
+                while (values[i] < pivot) i++
+                while (values[j] > pivot) j--
+                if (i <= j) {
+                    val t = values[i]; values[i] = values[j]; values[j] = t
+                    i++
+                    j--
+                }
+            }
+            when {
+                k <= j -> hi = j
+                k >= i -> lo = i
+                else -> return values[k]
+            }
+        }
+        return values[k]
     }
 
     /** Time of frame [t]'s flux value: halfway between the centres of frames t − 1 and t. */

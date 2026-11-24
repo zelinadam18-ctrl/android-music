@@ -61,19 +61,43 @@ object Stft {
 
         val re = DoubleArray(frameSize)
         val im = DoubleArray(frameSize)
-        val frames = Array(frameCount) { frame ->
-            val start = frame * hopSize
+        // Frames are real, so two at a time share one complex FFT: frame a as the real part,
+        // frame b as the imaginary part, separated afterwards by conjugate symmetry.
+        val plan = FftPlan(frameSize)
+        val bins = frameSize / 2 + 1
+        val frames = arrayOfNulls<FloatArray>(frameCount)
+        fun level(magnitude: Double) = max(FLOOR_DB, (20 * log10(magnitude / reference)).toFloat())
+        var frame = 0
+        while (frame < frameCount) {
+            val startA = frame * hopSize
+            val startB = startA + hopSize
+            val hasB = frame + 1 < frameCount
             for (i in 0 until frameSize) {
-                val index = start + i
-                re[i] = if (index < samples.size) samples[index] * window[i] else 0.0
-                im[i] = 0.0
+                val a = startA + i
+                val b = startB + i
+                re[i] = if (a < samples.size) samples[a] * window[i] else 0.0
+                im[i] = if (hasB && b < samples.size) samples[b] * window[i] else 0.0
             }
-            Fft.transform(re, im)
-            FloatArray(frameSize / 2 + 1) { bin ->
-                val magnitude = sqrt(re[bin] * re[bin] + im[bin] * im[bin])
-                max(FLOOR_DB, (20 * log10(magnitude / reference)).toFloat())
+            plan.transform(re, im)
+            val outA = FloatArray(bins)
+            val outB = if (hasB) FloatArray(bins) else null
+            for (k in 0 until bins) {
+                val m = (frameSize - k) and (frameSize - 1)
+                // A[k] = (Z[k] + conj(Z[N−k])) / 2,  B[k] = (Z[k] − conj(Z[N−k])) / 2i
+                val aRe = (re[k] + re[m]) / 2
+                val aIm = (im[k] - im[m]) / 2
+                outA[k] = level(sqrt(aRe * aRe + aIm * aIm))
+                if (outB != null) {
+                    val bRe = (im[k] + im[m]) / 2
+                    val bIm = (re[m] - re[k]) / 2
+                    outB[k] = level(sqrt(bRe * bRe + bIm * bIm))
+                }
             }
+            frames[frame] = outA
+            if (outB != null) frames[frame + 1] = outB
+            frame += 2
         }
-        return Spectrogram(sampleRate, frameSize, hopSize, frames, FLOOR_DB)
+        @Suppress("UNCHECKED_CAST")
+        return Spectrogram(sampleRate, frameSize, hopSize, frames as Array<FloatArray>, FLOOR_DB)
     }
 }
