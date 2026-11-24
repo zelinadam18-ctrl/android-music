@@ -3,7 +3,7 @@ package io.github.rudicilibrasi.pianotrainer.ui.graphs
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.FilterChip
@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.drawText
@@ -33,6 +34,7 @@ import io.github.rudicilibrasi.pianotrainer.core.music.Phrase
 import io.github.rudicilibrasi.pianotrainer.core.music.Pitch
 import io.github.rudicilibrasi.pianotrainer.core.scoring.AlignmentStep
 import io.github.rudicilibrasi.pianotrainer.core.scoring.PhraseScore
+import io.github.rudicilibrasi.pianotrainer.ui.staff.fontGrowth
 
 /** How a note fared in the alignment (#39). */
 enum class NoteOutcome(val label: String) {
@@ -187,11 +189,13 @@ fun ComparisonGraph(
     var aligned by remember { mutableStateOf(true) }
     val model = remember(phrase, detected, score, aligned) { ComparisonModel.of(phrase, tempoBpm, detected, score, aligned) }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(selected = aligned, onClick = { aligned = true }, label = { Text("Matched to tempo") })
-            FilterChip(selected = !aligned, onClick = { aligned = false }, label = { Text("As recorded") })
+        // At large font sizes the second chip moves to its own line instead of breaking mid-word.
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(selected = aligned, onClick = { aligned = true }, label = { Text("Matched to tempo", maxLines = 1, softWrap = false) })
+            FilterChip(selected = !aligned, onClick = { aligned = false }, label = { Text("As recorded", maxLines = 1, softWrap = false) })
         }
-        ComparisonCanvas(model, height)
+        // Taller with the font scale, like the pitch graph, so its note names still fit.
+        ComparisonCanvas(model, height * fontGrowth(LocalDensity.current.fontScale))
         Legend()
     }
 }
@@ -214,10 +218,15 @@ private fun ComparisonCanvas(model: ComparisonModel, height: Dp) {
         model.rows.forEachIndexed { row, midi ->
             if (Pitch(midi).name.length > 1) drawRect(scheme.surfaceVariant, Offset(left, rowTop(row)), Size(plotWidth, rowPx))
         }
-        if (rowPx * 2 >= measurer.measure("G3", labelStyle).size.height) {
-            model.labelledRows.forEach { (row, name) ->
-                val text = measurer.measure(name, labelStyle)
-                drawText(text, topLeft = Offset(0f, rowTop(row) + rowPx / 2 - text.size.height / 2f))
+        // As many note names as fit: when the played notes cover a wide range the rows get short,
+        // so skip a name that would touch the one drawn before it rather than dropping them all.
+        var lastLabelBottom = Float.NEGATIVE_INFINITY
+        model.labelledRows.sortedBy { it.first }.forEach { (row, name) ->
+            val text = measurer.measure(name, labelStyle)
+            val top = rowTop(row) + rowPx / 2 - text.size.height / 2f
+            if (top >= lastLabelBottom && top + text.size.height <= plotHeight + rowPx) {
+                drawText(text, topLeft = Offset(0f, top))
+                lastLabelBottom = top + text.size.height
             }
         }
 
