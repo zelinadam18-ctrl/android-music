@@ -39,3 +39,11 @@ kotlin {
         }
     }
 }
+
+// The JVM tests read the bundled songs from composeApp. Declare them as an input so that changing a
+// song re-runs the tests instead of reusing a cached result.
+tasks.named<Test>("jvmTest") {
+    inputs.dir(rootProject.layout.projectDirectory.dir("composeApp/src/commonMain/composeResources/files/songs"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+        .withPropertyName("bundledSongs")
+}
