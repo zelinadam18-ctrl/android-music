@@ -53,8 +53,8 @@ class NoteDetector(
     val weakStrikeDb: Double = 1.0,
     val loudRangeDb: Double = 6.0,
 ) {
-    private val onsetDetector = OnsetDetector(sampleRate)
-    private val pitchDetector = PitchDetector(sampleRate)
+    internal val onsetDetector = OnsetDetector(sampleRate)
+    internal val pitchDetector = PitchDetector(sampleRate)
     private val blockSize = (sampleRate * 0.01).roundToInt().coerceAtLeast(1)
 
     fun detect(recording: FloatArray): List<DetectedNote> = analyze(recording).notes
@@ -64,13 +64,27 @@ class NoteDetector(
      * draw graphs don't have to compute them again.
      */
     fun analyze(recording: FloatArray): NoteAnalysis {
-        val peak = recording.maxOfOrNull { abs(it) } ?: return NoteAnalysis(emptyList(), emptyList(), emptyList())
-        if (peak < silencePeak) return NoteAnalysis(emptyList(), emptyList(), pitchDetector.detect(recording))
-        val gain = (TARGET_PEAK / peak).toFloat()
-        val samples = FloatArray(recording.size) { recording[it] * gain }
+        val samples = normalized(recording) ?: return silence(recording)
+        return notesFrom(samples, pitchDetector.detect(samples), onsetDetector.detect(samples))
+    }
 
-        val frames = pitchDetector.detect(samples)
-        val onsets = onsetDetector.detect(samples)
+    /**
+     * The recording scaled to a fixed peak level, which [pitchDetector] and [onsetDetector] are
+     * run on; null if it is silent (see [silence]). Split out so the two can run in parallel.
+     */
+    internal fun normalized(recording: FloatArray): FloatArray? {
+        val peak = recording.maxOfOrNull { abs(it) } ?: return null
+        if (peak < silencePeak) return null
+        val gain = (TARGET_PEAK / peak).toFloat()
+        return FloatArray(recording.size) { recording[it] * gain }
+    }
+
+    /** The result for a recording [normalized] found silent: no notes. */
+    internal fun silence(recording: FloatArray): NoteAnalysis =
+        NoteAnalysis(emptyList(), emptyList(), if (recording.isEmpty()) emptyList() else pitchDetector.detect(recording))
+
+    /** The notes in [normalized][normalized] [samples], from their pitch [frames] and [onsets]. */
+    internal fun notesFrom(samples: FloatArray, frames: List<PitchFrame>, onsets: List<Onset>): NoteAnalysis {
         if (onsets.isEmpty()) return NoteAnalysis(emptyList(), onsets, frames)
         val blockRms = blockRms(samples)
         val noiseThreshold = noiseFloor(blockRms) * dbToRatio(noiseMarginDb)

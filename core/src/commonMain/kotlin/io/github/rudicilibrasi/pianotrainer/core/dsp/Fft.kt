@@ -82,6 +82,70 @@ object Fft {
     }
 }
 
+/**
+ * A radix-2 FFT of one fixed size with its bit-reversal and twiddle tables computed once, for
+ * code that runs thousands of same-size transforms (STFT frames, pitch frames). Same result as
+ * [Fft.transform]. Not shared between threads: create one per analysis.
+ */
+internal class FftPlan(val size: Int) {
+    init {
+        require(Fft.isPowerOfTwo(size)) { "FFT length must be a power of two, but was $size" }
+    }
+
+    private val reversed = IntArray(size).also { table ->
+        var j = 0
+        for (i in 1 until size) {
+            var bit = size shr 1
+            while (j and bit != 0) {
+                j = j xor bit
+                bit = bit shr 1
+            }
+            j = j or bit
+            table[i] = j
+        }
+    }
+
+    /** cos and −sin of 2πk/size for k < size/2. */
+    private val cosTable = DoubleArray(size / 2) { cos(2 * PI * it / size) }
+    private val sinTable = DoubleArray(size / 2) { -sin(2 * PI * it / size) }
+
+    /** Transforms ([re], [im]) in place, no scaling. */
+    fun transform(re: DoubleArray, im: DoubleArray) {
+        val n = size
+        for (i in 1 until n) {
+            val j = reversed[i]
+            if (i < j) {
+                val tr = re[i]; re[i] = re[j]; re[j] = tr
+                val ti = im[i]; im[i] = im[j]; im[j] = ti
+            }
+        }
+        var length = 2
+        while (length <= n) {
+            val half = length / 2
+            val stride = n / length
+            var start = 0
+            while (start < n) {
+                var t = 0
+                for (k in 0 until half) {
+                    val wRe = cosTable[t]
+                    val wIm = sinTable[t]
+                    t += stride
+                    val a = start + k
+                    val b = a + half
+                    val tRe = re[b] * wRe - im[b] * wIm
+                    val tIm = re[b] * wIm + im[b] * wRe
+                    re[b] = re[a] - tRe
+                    im[b] = im[a] - tIm
+                    re[a] += tRe
+                    im[a] += tIm
+                }
+                start += length
+            }
+            length *= 2
+        }
+    }
+}
+
 object Window {
     /** Periodic Hann window, the usual choice for overlapping STFT frames. */
     fun hann(size: Int): DoubleArray {
