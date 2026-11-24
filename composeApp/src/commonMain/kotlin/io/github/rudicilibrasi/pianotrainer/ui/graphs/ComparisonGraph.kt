@@ -247,10 +247,9 @@ private fun ComparisonCanvas(model: ComparisonModel, height: Dp) {
         }
 
         drawLine(scheme.onSurfaceVariant, Offset(left, plotHeight), Offset(size.width, plotHeight), strokeWidth = 1.dp.toPx())
-        model.ticks.zip(model.tickXs).forEach { (tick, x) ->
-            val text = measurer.measure(tick.label, labelStyle)
-            drawText(text, topLeft = Offset((px(x) - text.size.width / 2f).coerceIn(left, size.width - text.size.width), plotHeight + 4.dp.toPx()))
-        }
+        val texts = model.ticks.map { measurer.measure(it.label, labelStyle) }
+        TimeAxis.labelLefts(model.tickXs.map { px(it) }, texts.map { it.size.width.toFloat() }, left, size.width, 6.dp.toPx())
+            .forEachIndexed { i, textLeft -> textLeft?.let { drawText(texts[i], topLeft = Offset(it, plotHeight + 4.dp.toPx())) } }
     }
 }
 

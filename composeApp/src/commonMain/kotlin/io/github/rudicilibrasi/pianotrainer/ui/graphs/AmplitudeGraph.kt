@@ -101,11 +101,9 @@ fun AmplitudeGraph(result: AnalysisResult, modifier: Modifier = Modifier, height
         }
 
         drawLine(axis, Offset(0f, plotBottom), Offset(plotWidth, plotBottom), strokeWidth = 1.dp.toPx())
-        model.ticks.zip(model.tickXs).forEach { (tick, x) ->
-            val text = measurer.measure(tick.label, labelStyle)
-            val left = (px(x) - text.size.width / 2f).coerceIn(0f, plotWidth - text.size.width)
-            drawLine(axis, Offset(px(x), plotBottom), Offset(px(x), plotBottom + 3.dp.toPx()), strokeWidth = 1.dp.toPx())
-            drawText(text, topLeft = Offset(left, plotBottom + 4.dp.toPx()))
-        }
+        val texts = model.ticks.map { measurer.measure(it.label, labelStyle) }
+        model.tickXs.forEach { x -> drawLine(axis, Offset(px(x), plotBottom), Offset(px(x), plotBottom + 3.dp.toPx()), strokeWidth = 1.dp.toPx()) }
+        TimeAxis.labelLefts(model.tickXs.map { px(it) }, texts.map { it.size.width.toFloat() }, 0f, plotWidth, 6.dp.toPx())
+            .forEachIndexed { i, textLeft -> textLeft?.let { drawText(texts[i], topLeft = Offset(it, plotBottom + 4.dp.toPx())) } }
     }
 }

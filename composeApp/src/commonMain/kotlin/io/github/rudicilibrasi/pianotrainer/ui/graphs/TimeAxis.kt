@@ -19,6 +19,21 @@ object TimeAxis {
 
     private fun tickCount(durationSeconds: Double, step: Double): Long = (durationSeconds / step + 1e-9).toLong() + 1
 
+    /**
+     * Where to draw each tick label: centred on its tick, kept inside [minLeft]..[maxRight], and
+     * null (skipped) when it would touch the label before it, e.g. "0 s" and "1 s" on a narrow graph
+     * at a large font size. The first label is always drawn.
+     *
+     * @param centres each tick's x position; @param widths each label's width, in the same units.
+     */
+    fun labelLefts(centres: List<Float>, widths: List<Float>, minLeft: Float, maxRight: Float, gap: Float): List<Float?> {
+        var previousRight = Float.NEGATIVE_INFINITY
+        return centres.zip(widths).map { (centre, width) ->
+            val left = (centre - width / 2f).coerceIn(minLeft, maxOf(minLeft, maxRight - width))
+            if (left < previousRight + gap) null else left.also { previousRight = left + width }
+        }
+    }
+
     /** "0 s", "1.5 s", "0.25 s". */
     fun label(seconds: Double): String {
         val hundredths = (seconds * 100).roundToLong()
