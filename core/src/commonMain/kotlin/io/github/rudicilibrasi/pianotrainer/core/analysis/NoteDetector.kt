@@ -25,8 +25,12 @@ data class NoteAnalysis(val notes: List<DetectedNote>, val onsets: List<Onset>, 
  *    whose level stays within [noiseMarginDb] of it are ignored.
  * 3. An onset only starts a note if the recording gets louder there: a hammer strike always adds
  *    energy, so a flux peak with no level rise (more than [minOnsetRiseDb]) is partials trading
- *    energy inside a held note. One that rises by less than [weakStrikeDb] only counts if the
- *    pitch changes.
+ *    energy inside a held note. Where the level jumps by 12 dB or more, that is a note start
+ *    whatever the spectral flux says: the nearest flux onset moves onto it, or one is added. The
+ *    same pitch again only counts as a new note if it was struck again (a rise of at least
+ *    [weakStrikeDb], and either 6 dB or back near the previous note's peak), not a swell in a
+ *    tail. A segment with no pitch at all is a knock or a click, not a note, unless it is a strike
+ *    whose pitch settles in the next segment (they become one note) or as loud as the notes are.
  * 4. Each segment runs from one onset to the next (or the end of the recording). Its pitch comes
  *    from the voiced frames in its steady part (skipping the first [attackSeconds]) that are within
  *    [loudRangeDb] of its loudest, because a decaying tail on a phone recording often reads a
@@ -92,29 +96,104 @@ class NoteDetector(
 
         // A hammer strike always adds energy. A spectral-flux peak where the level doesn't rise
         // (partials beating or swapping as a note decays) is not a new note.
-        val candidates = onsets.filterIndexed { i, onset -> i == 0 || levelRiseDb(blockRms, onset.timeSeconds) > minOnsetRiseDb }
+        val candidates = alignToAttacks(onsets, strongAttacks(blockRms, noiseFloor(blockRms)))
+            .filterIndexed { i, onset -> i == 0 || levelRiseDb(blockRms, onset.timeSeconds) > minOnsetRiseDb }
+        val loudest = blockRms.maxOrNull() ?: 0.0
+        fun riseAt(i: Int) = if (i == 0) Double.POSITIVE_INFINITY else levelRiseDb(blockRms, candidates[i].timeSeconds)
 
         val noteOnsets = ArrayList<Onset>()
         val notes = ArrayList<DetectedNote?>()
         fun noteAt(start: Double, end: Double) = segmentNote(start, end, frames, blockRms, noiseThreshold)?.let { note ->
             notes.lastOrNull { it != null }?.let { struckUnderRingingNote(note, it, samples) } ?: note
         }
+        // A strike whose pitch hadn't settled by the next onset (the hammer noise can take
+        // 100 ms): that next segment is the rest of the same note.
+        var unsettled: Int? = null
         for (i in candidates.indices) {
-            val start = candidates[i].timeSeconds
+            val from = unsettled?.takeIf { riseAt(i) < RESTRIKE_RISE_DB } ?: i
+            unsettled = null
+            val onset = candidates[from]
+            val start = onset.timeSeconds
             val end = candidates.getOrNull(i + 1)?.timeSeconds ?: endSeconds
             val note = noteAt(start, end)
             val previous = notes.lastOrNull()
-            // A barely louder onset that doesn't change the pitch is the same note going on.
-            val weak = i > 0 && levelRiseDb(blockRms, start) < weakStrikeDb
-            if (weak && previous != null && (note == null || note.pitch == null || note.pitch == previous.pitch)) {
-                notes[notes.lastIndex] = null
-                notes[notes.lastIndex] = noteAt(previous.startMs / 1000, end)
-                continue
+            val rise = riseAt(from)
+            // Only this segment's own level: not the next note's attack.
+            val levelAfter = segmentLevel(blockRms, start, minOf(end - 0.01, start + ONSET_AFTER_SECONDS))
+            // The same pitch again is only a new note if it was struck again: the level jumps,
+            // or comes back near where the note started. A barely louder onset, or a small swell
+            // in a note that has already died away (strings beating), is the same note going on.
+            if (previous != null && (note == null || note.pitch == null || note.pitch == previous.pitch)) {
+                val previousPeak = segmentLevel(blockRms, previous.startMs / 1000, start)
+                val restruck = rise >= weakStrikeDb &&
+                    (rise >= RESTRIKE_RISE_DB || levelAfter >= previousPeak * dbToRatio(-RESTRIKE_LEVEL_DB))
+                if (!restruck) {
+                    notes[notes.lastIndex] = null
+                    notes[notes.lastIndex] = noteAt(previous.startMs / 1000, end)
+                    continue
+                }
             }
-            noteOnsets += candidates[i]
+            if (note != null && note.pitch == null) {
+                // A strike that hasn't settled into a pitch yet continues into the next segment,
+                // unless that one is a new strike.
+                if (rise >= RESTRIKE_RISE_DB && i + 1 < candidates.size && riseAt(i + 1) < RESTRIKE_RISE_DB) {
+                    unsettled = from
+                    continue
+                }
+                // Nothing pitched sounded: a knock, a click or handling noise, unless it was
+                // clearly struck as loudly as the notes are played.
+                if (!(rise >= UNPITCHED_STRIKE_RISE_DB && levelAfter >= loudest * dbToRatio(-UNPITCHED_MAX_BELOW_LOUDEST_DB))) continue
+            }
+            noteOnsets += onset
             notes += note
         }
         return NoteAnalysis(notes.filterNotNull(), noteOnsets, frames)
+    }
+
+    /**
+     * Times where the level jumps by at least [ATTACK_RISE_DB] within [ATTACK_SECONDS] from a
+     * quiet moment: unmistakable note starts, wherever the spectral flux put its onsets.
+     */
+    private fun strongAttacks(blockRms: DoubleArray, noiseFloor: Double): List<Double> {
+        // Measured from the noise floor at least, so a recording that starts from digital silence
+        // doesn't "attack" when the room noise comes in.
+        val db = DoubleArray(blockRms.size) { 20 * log10(max(blockRms[it], noiseFloor)) }
+        val ahead = (ATTACK_SECONDS * sampleRate / blockSize).roundToInt().coerceAtLeast(1)
+        val attacks = ArrayList<Double>()
+        var b = 1
+        while (b < db.size) {
+            val base = db[b - 1]
+            var peak = db[b]
+            for (k in b + 1..minOf(db.size - 1, b + ahead)) peak = max(peak, db[k])
+            val quietBefore = (maxOf(0, b - 3) until b).all { db[it] >= base - 1.0 }
+            if (db[b] - base >= ATTACK_FIRST_STEP_DB && peak - base >= ATTACK_RISE_DB && quietBefore) {
+                attacks += b.toDouble() * blockSize / sampleRate
+                b += (ATTACK_MIN_GAP_SECONDS * sampleRate / blockSize).roundToInt()
+            } else {
+                b++
+            }
+        }
+        return attacks
+    }
+
+    /**
+     * Moves the flux onset nearest each strong [attacks] time (within [ATTACK_SNAP_SECONDS]) onto
+     * it, and adds an onset for an attack the flux missed.
+     */
+    private fun alignToAttacks(onsets: List<Onset>, attacks: List<Double>): List<Onset> {
+        if (attacks.isEmpty()) return onsets
+        val result = onsets.toMutableList()
+        for (attack in attacks) {
+            val nearest = result.indices.minByOrNull { abs(result[it].timeSeconds - attack) }
+            if (nearest != null && abs(result[nearest].timeSeconds - attack) <= ATTACK_SNAP_SECONDS) {
+                result[nearest] = result[nearest].copy(timeSeconds = attack)
+            } else {
+                result += Onset(attack, strength = 1.0)
+            }
+        }
+        result.sortBy { it.timeSeconds }
+        // Two onsets now at the same attack are one.
+        return result.filterIndexed { i, onset -> i == 0 || onset.timeSeconds - result[i - 1].timeSeconds > 1e-9 }
     }
 
     /**
@@ -344,6 +423,31 @@ class NoteDetector(
 
         /** A newly struck note's harmonic gains at least this much at its onset. */
         const val STRIKE_MIN_RISE_DB = 12.0
+
+        /** A strong attack: the level rises this much within [ATTACK_SECONDS]… */
+        const val ATTACK_RISE_DB = 12.0
+        const val ATTACK_SECONDS = 0.05
+
+        /** …starting with a step of at least this much in the first 10 ms block. */
+        const val ATTACK_FIRST_STEP_DB = 3.0
+
+        /** Strong attacks closer together than this are one. */
+        const val ATTACK_MIN_GAP_SECONDS = 0.1
+
+        /** A flux onset this close to a strong attack is moved onto it. */
+        const val ATTACK_SNAP_SECONDS = 0.08
+
+        /** The same pitch counts as struck again if the level jumps at least this much… */
+        const val RESTRIKE_RISE_DB = 6.0
+
+        /** …or comes back to within this much of the previous note's peak. */
+        const val RESTRIKE_LEVEL_DB = 6.0
+
+        /** An unpitched segment is only a note if its onset rose this much… */
+        const val UNPITCHED_STRIKE_RISE_DB = 10.0
+
+        /** …and it is within this much of the loudest moment in the recording. */
+        const val UNPITCHED_MAX_BELOW_LOUDEST_DB = 6.0
 
         /** How far before an onset the level is measured, to see whether the onset adds energy. */
         const val ONSET_BEFORE_SECONDS = 0.04

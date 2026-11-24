@@ -202,6 +202,74 @@ class NoteDetectorTest {
         assertEquals(listOf(a4), notes.map { it.pitch }, "notes $notes")
     }
 
+    /** Adds white noise at [amplitude] between two times, with 2 ms fades. */
+    private fun addNoise(buffer: FloatArray, fromSeconds: Double, toSeconds: Double, amplitude: Double, random: Random) {
+        val from = (fromSeconds * sampleRate).toInt()
+        val to = minOf((toSeconds * sampleRate).toInt(), buffer.size)
+        val fade = sampleRate / 500
+        for (i in from until to) {
+            val envelope = minOf(1.0, (i - from).toDouble() / fade, (to - i).toDouble() / fade)
+            buffer[i] += ((random.nextDouble() * 2 - 1) * amplitude * envelope).toFloat()
+        }
+    }
+
+    @Test
+    fun knocksBetweenShortNotesAreNotNotes() {
+        // Staccato: each note dies away before the next, and in the quiet gaps the phone picks up
+        // short knocks (keys, the bench). Only the two notes are notes.
+        val random = Random(5)
+        val buffer = FloatArray(sampleRate * 3)
+        addNoise(buffer, 0.0, 3.0, 0.0005, random)
+        val g4 = Pitch.parse("G4")
+        val a4 = Pitch.parse("A4")
+        addTone(buffer, g4.frequencyHz, 0.3, 0.6, listOf(1.0, 0.5, 0.3), decaySeconds = 0.12)
+        for (knock in listOf(1.0, 1.2, 1.4)) addNoise(buffer, knock, knock + 0.03, 0.02, random)
+        addTone(buffer, a4.frequencyHz, 1.65, 0.6, listOf(1.0, 0.5, 0.3), decaySeconds = 0.12)
+        val notes = detector.detect(buffer)
+        assertEquals(listOf(g4, a4), notes.map { it.pitch }, "notes $notes")
+    }
+
+    @Test
+    fun aDecayedNoteWhoseStringsBeatIsOneNote() {
+        // A held note that has died away to its tail, where two slightly detuned strings beat: the
+        // level swells a little every 0.2 s. Those swells are not new notes.
+        val buffer = FloatArray(sampleRate * 3)
+        val g4 = Pitch.parse("G4")
+        addTone(buffer, g4.frequencyHz, 0.25, 2.5, listOf(1.0, 0.4, 0.2), decaySeconds = 0.15)
+        // The beating tail, about 25 dB below the attack: a second string 5 Hz off, weaker, so the
+        // level swells by a few dB (as measured on a phone) rather than beating down to silence.
+        addTone(buffer, g4.frequencyHz, 0.25, 2.5, listOf(0.03), decaySeconds = 4.0)
+        addTone(buffer, g4.frequencyHz + 5, 0.25, 2.5, listOf(0.006), decaySeconds = 4.0)
+        val notes = detector.detect(buffer)
+        assertEquals(listOf(g4), notes.map { it.pitch }, "notes $notes")
+    }
+
+    @Test
+    fun aStrikeWhosePitchTakesAMomentToSettleIsOneNote() {
+        // A hard strike: about 80 ms of hammer noise, at about the level the note then sounds at,
+        // before the string's pitch comes through. The pitch arriving is not a second note.
+        val random = Random(9)
+        val buffer = FloatArray(sampleRate * 2)
+        val e4 = Pitch.parse("E4")
+        addNoise(buffer, 0.0, 2.0, 0.001, random)
+        addNoise(buffer, 0.3, 0.39, 0.3, random)
+        addTone(buffer, e4.frequencyHz, 0.38, 1.0, listOf(1.0, 0.5, 0.3), decaySeconds = 0.5)
+        val notes = detector.detect(buffer)
+        assertEquals(listOf(e4), notes.map { it.pitch }, "notes $notes")
+        assertTrue(abs(notes.single().startMs - 300) < 40, "starts at ${notes.single().startMs} ms")
+    }
+
+    @Test
+    fun aRecordingThatStartsFromDigitalSilenceHasNoExtraNote() {
+        // The phone's first few milliseconds are exact zeros, then the room's noise comes in.
+        val random = Random(3)
+        val buffer = FloatArray(sampleRate * 2)
+        addNoise(buffer, 0.02, 2.0, 0.001, random)
+        val c4 = Pitch.parse("C4")
+        addTone(buffer, c4.frequencyHz, 0.8, 1.0, listOf(1.0, 0.5, 0.3), decaySeconds = 0.5)
+        assertEquals(listOf(c4), detector.detect(buffer).map { it.pitch })
+    }
+
     @Test
     fun worksAtOtherSampleRates() {
         val rate = 22050

@@ -164,7 +164,7 @@ class AudioAnalyzer(private val dispatcher: CoroutineDispatcher = Dispatchers.De
          * Bump whenever detection or analysis changes in a way that could change results, so saved
          * history records which algorithm produced it.
          */
-        const val ANALYSIS_VERSION = 2
+        const val ANALYSIS_VERSION = 3
 
         /** Most time columns in any graph. */
         const val MAX_COLUMNS = 400
