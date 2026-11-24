@@ -71,6 +71,18 @@ class StaffLayoutTest {
     // --- Rhythm (#25) ---
 
     @Test
+    fun aBarLineAfterAFlaggedNoteClearsTheFlag() {
+        // Jingle Bells phrase 2: the bar after D4's flag used to be drawn on top of the flag.
+        val layout = layout("E4/1 G4/1 C4/1.5 D4/0.5 E4/4", fourFour)
+        val stem = assertNotNull(layout.events[3].stem)
+        assertTrue(stem.up && stem.flags == 1)
+        assertEquals(1, layout.barLineXs.size)
+        val flagRight = stem.x + StaffLayout.FLAG_WIDTH
+        assertTrue(layout.barLineXs[0] > flagRight + 0.4, "bar at ${layout.barLineXs[0]}, flag ends at $flagRight")
+        assertTrue(layout.barLineXs[0] < layout.events[4].x)
+    }
+
+    @Test
     fun noteValuesAndDotsFromBeats() {
         assertEquals(NoteValue.Whole to 0, NoteValue.of(4.0))
         assertEquals(NoteValue.Half to 1, NoteValue.of(3.0))
