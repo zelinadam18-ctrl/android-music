@@ -36,6 +36,7 @@ import io.github.rudicilibrasi.pianotrainer.core.notation.TrebleStaff
 import io.github.rudicilibrasi.pianotrainer.core.scoring.Alignment
 import io.github.rudicilibrasi.pianotrainer.core.scoring.AlignmentStep
 import org.jetbrains.compose.resources.Font
+import kotlin.math.roundToInt
 import pianotrainer.composeapp.generated.resources.Res
 import pianotrainer.composeapp.generated.resources.bravura
 
@@ -68,11 +69,25 @@ data class PlayedSlot(
  * Where the played notes go on the second staff (#44): each one under the expected note it was
  * aligned with (#39), extra notes between their neighbours, and a marked gap for each missed
  * note. Uses the expected staff's [StaffLayout] for horizontal positions and the same vertical
- * scale, so the two staves read as one comparison.
+ * scale, so the two staves read as one comparison. The frame only grows, by [topStep] and
+ * [bottomStep], when something was played outside the expected staff's range (e.g. G2 under a
+ * C4–A4 phrase), so that note gets its ledger lines and label room instead of spilling out.
  */
-class DetectedStaffModel(val expected: StaffLayout, val slots: List<PlayedSlot>, val width: Double) {
+class DetectedStaffModel(
+    val expected: StaffLayout,
+    val slots: List<PlayedSlot>,
+    val width: Double,
+    private val topStep: Int,
+    private val bottomStep: Int,
+) {
 
-    fun y(step: Int): Double = expected.y(step)
+    fun y(step: Int): Double = (topStep - step) * 0.5
+
+    /** Top of the note-label row, below the lowest played note. */
+    val labelTop: Double get() = y(bottomStep) + 0.5
+
+    /** Total height, including the label row. */
+    val height: Double get() = labelTop + StaffLayout.LABEL_ROW_SPACES
 
     val description: String
         get() = "What you played: " + slots.joinToString(", ") { "${it.label} ${it.mark.spoken}" }
@@ -103,6 +118,14 @@ class DetectedStaffModel(val expected: StaffLayout, val slots: List<PlayedSlot>,
                 }
             }
 
+            // The expected staff's frame (y(step) = (top - step) / 2), grown to fit every played note
+            // with a step of room either side, as StaffLayout leaves around its own notes.
+            val playedSteps = detected.mapNotNull { note -> note.pitch?.let { TrebleStaff.position(it).step } }
+            val expectedTop = (expected.y(0) * 2).roundToInt()
+            val expectedBottom = expectedTop - ((expected.labelTop - 0.5) * 2).roundToInt()
+            val top = maxOf(expectedTop, (playedSteps.maxOrNull() ?: Int.MIN_VALUE) + 2)
+            val bottom = minOf(expectedBottom, (playedSteps.minOrNull() ?: Int.MAX_VALUE) - 2)
+            fun frameY(step: Int) = (top - step) * 0.5
             val slots = steps.mapIndexed { i, step ->
                 val note = when (step) {
                     is AlignmentStep.Match -> detected[step.detectedIndex]
@@ -123,8 +146,8 @@ class DetectedStaffModel(val expected: StaffLayout, val slots: List<PlayedSlot>,
                     x = xs[i],
                     step = position?.step,
                     sharp = position?.accidental == Accidental.SHARP,
-                    ledgerLineYs = position?.ledgerLines?.map(expected::y).orEmpty(),
-                    y = position?.step?.let(expected::y),
+                    ledgerLineYs = position?.ledgerLines?.map(::frameY).orEmpty(),
+                    y = position?.step?.let(::frameY),
                     mark = mark,
                     label = when {
                         step is AlignmentStep.Deletion -> "—"
@@ -134,7 +157,7 @@ class DetectedStaffModel(val expected: StaffLayout, val slots: List<PlayedSlot>,
                 )
             }
             val width = maxOf(expected.width, (xs.maxOrNull() ?: 0.0) + StaffLayout.LAST_NOTE_ROOM)
-            return DetectedStaffModel(expected, slots, width)
+            return DetectedStaffModel(expected, slots, width, top, bottom)
         }
     }
 }
@@ -200,17 +223,17 @@ private fun DetectedStaff(model: DetectedStaffModel, staffSpace: Dp, scroll: Scr
 
     Canvas(
         Modifier.horizontalScroll(scroll)
-            .size(staffSpace * model.width.toFloat(), staffSpace * layout.height.toFloat())
+            .size(staffSpace * model.width.toFloat(), staffSpace * model.height.toFloat())
             .semantics { contentDescription = model.description },
     ) {
         fun px(spaces: Double) = (spaces * spacePx).toFloat()
         for (step in layout.lineSteps) {
-            val y = px(layout.y(step))
+            val y = px(model.y(step))
             drawLine(ink, Offset(0f, y), Offset(px(model.width), y), strokeWidth = px(STAFF_LINE_THICKNESS))
         }
-        drawGlyph(measurer, Glyph.G_CLEF, music, ink, x = px(layout.clefX), baselineY = px(layout.clefY), centred = false)
+        drawGlyph(measurer, Glyph.G_CLEF, music, ink, x = px(layout.clefX), baselineY = px(model.y(TrebleStaff.BOTTOM_LINE + 2)), centred = false)
 
-        val middleY = px(layout.y(TrebleStaff.MIDDLE_LINE))
+        val middleY = px(model.y(TrebleStaff.MIDDLE_LINE))
         for (slot in model.slots) {
             val colour = colours.getValue(slot.mark)
             val x = px(slot.x)
@@ -223,10 +246,10 @@ private fun DetectedStaff(model: DetectedStaffModel, staffSpace: Dp, scroll: Scr
                 drawGlyph(measurer, Glyph.NOTEHEAD_BLACK, music, colour, x = x, baselineY = headY, centred = true)
             }
             // The outcome symbol, just above the staff (or the note, if higher), so it never hides the head.
-            val symbolY = minOf(px(layout.staffTopY) - px(1.2), (headY ?: middleY) - px(1.6))
+            val symbolY = minOf(px(model.y(TrebleStaff.TOP_LINE)) - px(1.2), (headY ?: middleY) - px(1.6))
             markSymbol(slot.mark, Offset(x, symbolY), px(0.55), colour, measurer, labelStyle)
             val text = measurer.measure(slot.label, labelStyle.copy(color = colour))
-            drawText(text, topLeft = Offset(x - text.size.width / 2f, px(layout.labelTop)))
+            drawText(text, topLeft = Offset(x - text.size.width / 2f, px(model.labelTop)))
         }
     }
 }
