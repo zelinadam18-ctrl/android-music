@@ -22,15 +22,13 @@ import io.github.rudicilibrasi.pianotrainer.database.buildPianoDatabase
  * and hands them to screens. Kept as plain constructor wiring; it can move to a DI library such as
  * Koin if it grows unwieldy.
  *
- * Create exactly one per process: on Android from the `Application`, on iOS once in
- * `MainViewController`.
+ * Create exactly one per process, from the `Application`.
  *
- * @param databaseBuilder the platform's database builder: `databaseBuilder(context)` on Android,
- *   `databaseBuilder()` on iOS.
- * @param audioPlayer the platform's player: `AndroidAudioPlayer` or `IosAudioPlayer`.
- * @param audioRecorder the platform's recorder: `AndroidAudioRecorder` or `IosAudioRecorder`.
+ * @param databaseBuilder the database builder: `databaseBuilder(context)`.
+ * @param audioPlayer the player: `AndroidAudioPlayer`.
+ * @param audioRecorder the recorder: `AndroidAudioRecorder`.
  * @param openAppSettings opens this app's page in the system Settings, e.g. to allow the microphone.
- * @param storageRoot the app's private folder for WAV files: Android `filesDir`, iOS Application Support.
+ * @param storageRoot the app's private folder for WAV files: `context.filesDir`.
  */
 class AppContainer(
     databaseBuilder: RoomDatabase.Builder<PianoDatabase>,

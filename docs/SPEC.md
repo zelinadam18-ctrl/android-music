@@ -1,6 +1,6 @@
 # Project: Beginner Piano Learning App — Phase Two
 
-This is the product specification for a beginner piano trainer for Android and iOS **phones** (not tablets or desktop). The technology choices are recorded in [`decisions/0001-tech-stack.md`](decisions/0001-tech-stack.md), and the work is broken into GitHub issues tracked by the [roadmap issue](https://github.com/rudi-cilibrasi/musicprompt/issues/71).
+This is the product specification for a beginner piano trainer for Android **phones** (not tablets or desktop). The technology choices are recorded in [`decisions/0001-tech-stack.md`](decisions/0001-tech-stack.md), and the work is broken into GitHub issues tracked by the [roadmap issue](https://github.com/rudi-cilibrasi/musicprompt/issues/71).
 
 ## Song Sources and Verification
 
@@ -8,7 +8,7 @@ Implement the complete app without requiring me to manually enter note sequences
 
 ## Overview
 
-Approach this project as an expert senior mobile engineer and system architect. Build a professional, user-friendly phone application for Android and iOS using Kotlin Multiplatform and Compose Multiplatform. The app targets phones only; tablets and desktop are out of scope.
+Approach this project as an expert senior mobile engineer and system architect. Build a professional, user-friendly phone application for Android using Kotlin Multiplatform and Compose Multiplatform. The app targets phones only; tablets and desktop are out of scope.
 
 This project builds on the concept of my previous piano-learning application. However, **this specification will be implemented in a new, empty Kotlin Multiplatform project**. You must implement the application from scratch rather than assuming any existing code, screens, classes, or functionality are present.
 
@@ -246,7 +246,7 @@ The app should:
 - Save the generated reference recording as a WAV file.
 - Allow the student to play and replay the reference.
 
-Generate PCM audio in shared code and play it with each platform's audio API (for example, AudioTrack or MediaPlayer on Android and AVAudioEngine or AVAudioPlayer on iOS), with a suitable sample rate and audio format.
+Generate PCM audio in shared code and play it with the Android audio API (for example, AudioTrack or MediaPlayer), with a suitable sample rate and audio format.
 
 If using synthesized piano tones rather than sampled piano sounds, make them sound as musical and natural as reasonably possible.
 
@@ -378,7 +378,7 @@ Each saved attempt should include, where applicable:
 
 The student should be able to open an old test and view its results without changing current progression or accidentally recording a new attempt.
 
-Store structured data in a local Room database (Room for Kotlin Multiplatform, shared by Android and iOS) and store WAV recordings as files, saving their paths or URIs in the database.
+Store structured data in a local Room database (Room for Kotlin Multiplatform) and store WAV recordings as files, saving their paths or URIs in the database.
 
 Ensure that saved recordings remain accessible after the application is closed and reopened.
 
@@ -390,7 +390,7 @@ Keep historical attempts separate from current progress. Reviewing an old result
 
 Because this is the foundation of a larger learning application, implement a clean and maintainable architecture.
 
-Use Kotlin Multiplatform with an MVVM architecture. Share as much code as practical between Android and iOS, and keep platform-specific code (audio recording and playback, audio session, file locations, permissions) behind small interfaces.
+Use Kotlin Multiplatform with an MVVM architecture. Keep as much code as practical platform-independent, and keep platform-specific code (audio recording and playback, audio session, file locations, permissions) behind small interfaces.
 
 Separate responsibilities into appropriate components, such as:
 - User interface.
@@ -409,7 +409,7 @@ Separate responsibilities into appropriate components, such as:
 - Achievement and star management.
 - Test history.
 - Local persistence.
-- Platform-specific audio, file, and permission code for Android and iOS.
+- Platform-specific audio, file, and permission code for Android.
 
 Use Room for structured persistent data and a suitable file-management approach for WAV recordings.
 
@@ -466,7 +466,7 @@ Since the project starts empty:
 - Implement persistent progression and achievement rules.
 - Test important edge cases, including restarting the app, retaking a phrase, scoring below 50, earning exactly 50, scoring below 90 overall, and earning exactly 90 overall.
 - Test the progression and star rules with unit tests that supply scores directly, such as 49, 50, 89, and 90. Supplying scores in tests is expected; the ban on hardcoded scores applies to the app itself.
-- Ensure that the app builds for both Android and iOS, and fix build errors introduced by the implementation.
+- Ensure that the app builds for Android, and fix build errors introduced by the implementation.
 - Avoid replacing real functionality with hardcoded demo scores, fake note detection, or placeholder buttons.
 - Do not claim that a feature is implemented if it is only a visual placeholder.
 
@@ -476,7 +476,7 @@ If a feature requires a technical trade-off, choose the most reliable practical 
 
 ## 17. Final Acceptance Criteria
 
-The implementation is not complete until the following conditions are met on both an Android phone and an iPhone:
+The implementation is not complete until the following conditions are met on an Android phone:
 
 1. The app launches and displays all 6 songs.
 2. A student can select a song and practice its first phrase.
@@ -496,13 +496,13 @@ The implementation is not complete until the following conditions are met on bot
 16. Previous attempts and WAV recordings remain accessible through Test History.
 17. Reviewing old tests does not alter current progress.
 18. All 6 songs use coherent, beginner-appropriate arrangements and consistent musical data.
-19. The project builds successfully for Android and iOS, and the implemented screens and controls perform their intended actions.
+19. The project builds successfully for Android, and the implemented screens and controls perform their intended actions.
 
 **Final priority:** Preserve the original app's complete learning, audio-analysis, graphing, feedback, scoring, and saved-test experience while adding the 6-song catalog, phrase-by-phrase progression, persistent progress tracking, and song-level star achievements. The application must be fully functional and ready for further development, not merely a visual prototype.
 
 # Appendix: Original Phase One Specification
 
-The following is the specification of the original application. Use it as the reference for the features, format, and behavior that Phase Two must preserve. In Phase Two, song-based lessons replace the random six-note sequence as the main lesson flow; the random exercise remains only as the optional Free Practice mode. The original application was Android-only, so its platform-specific wording (Android Studio, AudioTrack, Activity) describes that app; where it conflicts with the cross-platform choices above, the main specification takes precedence.
+The following is the specification of the original application. Use it as the reference for the features, format, and behavior that Phase Two must preserve. In Phase Two, song-based lessons replace the random six-note sequence as the main lesson flow; the random exercise remains only as the optional Free Practice mode. Where its platform-specific wording (Android Studio, AudioTrack, Activity) conflicts with the choices above, the main specification takes precedence.
 
 Approach this app as an **expert senior Android Studio engineer and system architect**. Make this app user-friendly, with a professional look and feel. This app will be written in **Android Studio using Kotlin**.
 

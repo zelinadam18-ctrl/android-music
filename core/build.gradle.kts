@@ -20,9 +20,6 @@ kotlin {
         withHostTest {}
     }
 
-    iosArm64()
-    iosSimulatorArm64()
-
     // Only used to run the tests quickly on macOS, Windows and Linux (`./gradlew :core:jvmTest`).
     // There is no desktop app.
     jvm {

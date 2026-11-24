@@ -18,12 +18,12 @@ sealed interface StoredFile {
  *
  * Everything outside this class uses **relative** paths such as
  * `recordings/2026-10-25T17-03-12_twinkle_p3.wav`, which is what the database stores. Only
- * [absolute] turns one into a full path, at the moment a platform API needs it, because on iOS the
- * app container's absolute path can change between installs and updates.
+ * [absolute] turns one into a full path, at the moment a platform API needs it, so stored paths
+ * stay valid even if the app's private folder moves.
  *
  * Missing or unreadable files come back as results, never crashes.
  *
- * @param root the app's private folder: Android `context.filesDir`, iOS Application Support.
+ * @param root the app's private folder: `context.filesDir`.
  */
 class AppStorage(private val root: Path, private val fileSystem: FileSystem = FileSystem.SYSTEM) {
 

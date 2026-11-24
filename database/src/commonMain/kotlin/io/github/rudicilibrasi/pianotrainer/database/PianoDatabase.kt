@@ -13,7 +13,7 @@ import kotlinx.coroutines.IO
  * added here; bump [version] and add a migration when the schema changes after release.
  *
  * Build one with [buildPianoDatabase] from a platform builder: `databaseBuilder(context)` on
- * Android, `databaseBuilder()` on iOS.
+ * Android, a temporary file in the JVM tests.
  */
 @Database(
     entities = [MetadataEntity::class, SongProgressEntity::class, PhraseProgressEntity::class, AttemptEntity::class],
